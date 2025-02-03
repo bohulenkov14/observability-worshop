@@ -1,0 +1,27 @@
+# Tempo data
+tempo-data/
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# VS Code
+.vscode/
+.settings/
+.project
+.classpath
+
+# Logs
+*.log
+
+# OS-specific files
+.DS_Store
+Thumbs.db 

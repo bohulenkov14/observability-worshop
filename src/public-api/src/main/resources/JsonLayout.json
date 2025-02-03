@@ -1,0 +1,51 @@
+{
+    "@timestamp": {
+        "$resolver": "timestamp",
+        "pattern": {
+            "format": "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            "timeZone": "UTC"
+        }
+    },
+    "level": {
+        "$resolver": "level",
+        "field": "name"
+    },
+    "thread_name": {
+        "$resolver": "thread",
+        "field": "name"
+    },
+    "logger_name": {
+        "$resolver": "logger",
+        "field": "name"
+    },
+    "message": {
+        "$resolver": "message",
+        "stringified": true
+    },
+    "trace_id": {
+        "$resolver": "mdc",
+        "key": "trace_id"
+    },
+    "span_id": {
+        "$resolver": "mdc",
+        "key": "span_id"
+    },
+    "trace_flags": {
+        "$resolver": "mdc",
+        "key": "trace_flags"
+    },
+    "service.name": {
+        "$resolver": "pattern",
+        "pattern": "public-api"
+    },
+    "exception": {
+        "$resolver": "exception",
+        "field": "stackTrace",
+        "stackTrace": {
+            "stringified": true
+        }
+    },
+    "structured_data": {
+        "$resolver": "structured"
+    }
+}

@@ -1,0 +1,39 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
+exporters:
+  debug:
+  otlp:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  otlphttp/prometheus:
+    endpoint: "http://prometheus:9090/api/v1/otlp"
+    tls:
+      insecure: true
+  otlphttp/logs:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
+processors:
+  batch:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 500
+    spike_limit_mib: 100
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/prometheus, debug]
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/logs]
