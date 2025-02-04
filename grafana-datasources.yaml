@@ -5,35 +5,57 @@ datasources:
   type: prometheus
   uid: prometheus
   access: proxy
-  orgId: 1
   url: http://prometheus:9090
   basicAuth: false
   isDefault: false
-  version: 1
   editable: false
   jsonData:
     httpMethod: GET
 - name: Tempo
   type: tempo
+  uid: tempo
   access: proxy
-  orgId: 1
   url: http://tempo:3200
   basicAuth: false
   isDefault: true
-  version: 1
   editable: false
-  apiVersion: 1
-  uid: tempo
   jsonData:
-    httpMethod: GET
     serviceMap:
       datasourceUid: prometheus
+    tracesToLogsV2:
+      datasourceUid: loki
+      spanStartTimeShift: '-30m'
+      spanEndTimeShift: '30m'
+      tags: [{ key: 'service.name', value: 'service_name' }]
+      filterByTraceID: false
+      filterBySpanID: false
+      customQuery: true
+      query: '{$${__tags}} | span_id="$${__span.spanId}"'
+    traceQuery:
+      timeShiftEnabled: true
+      spanStartTimeShift: '-1h'
+      spanEndTimeShift: '1h'
+    nodeGraph:
+      enabled: true
     streamingEnabled:
       search: true
 - name: Loki
   type: loki
+  uid: loki
   access: proxy
   url: http://loki:3100
+  editable: false
   jsonData:
     timeout: 60
     maxLines: 1000
+    derivedFields:
+      - datasourceUid: tempo
+        matcherRegex: trace_id
+        matcherType: label
+        name: Trace ID
+        url: '$${__value.raw}'
+      - datasourceUid: tempo
+        matcherRegex: span_id
+        matcherType: label
+        name: Span ID
+        url: '{ span:id = "$${__value.raw}"}'

@@ -27,6 +27,8 @@ compactor:
   compaction:
     block_retention: 1h                # overall Tempo trace retention. set for demo purposes
 
+    
+
 metrics_generator:
   registry:
     external_labels:

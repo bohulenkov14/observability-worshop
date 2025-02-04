@@ -69,15 +69,18 @@ dependencies {
     implementation("org.http4k:http4k-format-jackson")
     implementation("org.http4k:http4k-ops-opentelemetry")
     implementation("org.http4k:http4k-server-jetty")
-    implementation("org.slf4j:slf4j-api:2.0.9")
-    implementation("org.apache.logging.log4j:log4j-core:2.22.1")
-    implementation("org.apache.logging.log4j:log4j-slf4j2-impl:2.22.1")
-    implementation("org.apache.logging.log4j:log4j-layout-template-json:2.22.1")
-    implementation("io.opentelemetry:opentelemetry-api:1.34.1")
-    implementation("io.opentelemetry:opentelemetry-sdk:1.34.1")
+    implementation("org.slf4j:slf4j-api:2.0.16")
+    implementation("ch.qos.logback:logback-classic:1.4.14")
+    implementation("net.logstash.logback:logstash-logback-encoder:7.4")
     testImplementation("org.http4k:http4k-testing-approval")
     testImplementation("org.http4k:http4k-testing-hamkrest")
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.11.4")
+
+    configurations {
+        all {
+            exclude(group = "org.apache.logging.log4j")
+        }
+    }
 }
 

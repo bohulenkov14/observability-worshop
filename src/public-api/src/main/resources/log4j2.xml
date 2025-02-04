@@ -1,23 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Configuration status="INFO">
+<Configuration status="WARN" packages="org.apache.logging.log4j.core">
     <Properties>
-        <Property name="LOG_PATTERN">%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ} %level [%t] %c{1.} - %msg%n</Property>
+        <Property name="serviceName">public-api</Property>
     </Properties>
 
     <Appenders>
-        <Console name="ConsoleAppender" target="SYSTEM_OUT">
-            <JsonTemplateLayout eventTemplateUri="classpath:JsonLayout.json">
-                <EventTemplateAdditionalField key="service.name" value="public-api"/>
-            </JsonTemplateLayout>
+        <Console name="Console" target="SYSTEM_OUT">
+            <JsonLayout complete="false" compact="true" eventEol="true">
+                <KeyValuePair key="timestamp" value="$${date:yyyy-MM-dd'T'HH:mm:ss.SSSZ}"/>
+                <KeyValuePair key="service.name" value="${serviceName}"/>
+                <KeyValuePair key="trace.id" value="$${ctx:trace_id:-}"/>
+                <KeyValuePair key="span.id" value="$${ctx:span_id:-}"/>
+            </JsonLayout>
         </Console>
     </Appenders>
 
     <Loggers>
-        <!-- Reduce noise from Jetty -->
-        <Logger name="org.eclipse.jetty" level="WARN"/>
-        
+        <Logger name="org.eclipse.jetty" level="WARN" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+        <Logger name="org.apache.http" level="WARN" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
         <Root level="INFO">
-            <AppenderRef ref="ConsoleAppender"/>
+            <AppenderRef ref="Console"/>
         </Root>
     </Loggers>
-</Configuration> 
+</Configuration>
