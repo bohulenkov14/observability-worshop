@@ -1,0 +1,329 @@
+{
+    "annotations": {
+        "list": [{
+            "builtIn": 1,
+            "datasource": "-- Grafana --",
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "target": {
+                "limit": 100,
+                "matchAny": false,
+                "tags": [],
+                "type": "dashboard"
+            },
+            "type": "dashboard"
+        }]
+    },
+    "editable": true,
+    "gnetId": null,
+    "graphTooltip": 0,
+    "id": null,
+    "iteration": 0,
+    "links": [],
+    "panels": [{
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "req/sec",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            { "color": "green", "value": null },
+                            { "color": "red", "value": 80 }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+            "id": 1,
+            "options": {
+                "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] },
+                "tooltip": { "mode": "single" }
+            },
+            "targets": [{
+                "exemplar": true,
+                "expr": "rate(http_server_request_count_total[1m])",
+                "format": "time_series",
+                "instant": false,
+                "interval": "",
+                "intervalFactor": 2,
+                "legendFormat": "{{job}}",
+                "refId": "A"
+            }],
+            "title": "HTTP Request Rate",
+            "type": "timeseries"
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "s",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            { "color": "green", "value": null },
+                            { "color": "red", "value": 1 }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+            "id": 2,
+            "options": {
+                "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+                "tooltip": { "mode": "single" }
+            },
+            "targets": [{
+                "exemplar": true,
+                "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[1m])) by (le))",
+                "format": "time_series",
+                "instant": false,
+                "interval": "",
+                "intervalFactor": 2,
+                "legendFormat": "95th Percentile",
+                "refId": "A"
+            }],
+            "title": "HTTP Request 95th Percentile Duration (s)",
+            "type": "timeseries"
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "ms",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            { "color": "green", "value": null },
+                            { "color": "red", "value": 500 }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+            "id": 3,
+            "options": {
+                "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+                "tooltip": { "mode": "single" }
+            },
+            "targets": [{
+                "exemplar": true,
+                "expr": "histogram_quantile(0.95, sum(rate(http_server_request_latency_milliseconds_bucket[1m])) by (le))",
+                "format": "time_series",
+                "instant": false,
+                "interval": "",
+                "intervalFactor": 2,
+                "legendFormat": "95th Percentile",
+                "refId": "A"
+            }],
+            "title": "HTTP Request 95th Percentile Latency (ms)",
+            "type": "timeseries"
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            { "color": "green", "value": null },
+                            { "color": "red", "value": 80 }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+            "id": 4,
+            "options": {
+                "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+                "tooltip": { "mode": "single" }
+            },
+            "targets": [{
+                "expr": "avg(jvm_cpu_recent_utilization_ratio) by (instance)",
+                "format": "time_series",
+                "instant": false,
+                "interval": "",
+                "intervalFactor": 2,
+                "legendFormat": "{{instance}}",
+                "refId": "A"
+            }],
+            "title": "JVM CPU Utilization",
+            "type": "timeseries"
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bytes",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            { "color": "green", "value": null },
+                            { "color": "red", "value": 1000000000 }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+            "id": 5,
+            "options": {
+                "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+                "tooltip": { "mode": "single" }
+            },
+            "targets": [{
+                    "expr": "jvm_memory_used_bytes",
+                    "format": "time_series",
+                    "instant": false,
+                    "interval": "",
+                    "intervalFactor": 2,
+                    "legendFormat": "Used Memory",
+                    "refId": "A"
+                },
+                {
+                    "expr": "jvm_memory_committed_bytes",
+                    "format": "time_series",
+                    "instant": false,
+                    "interval": "",
+                    "intervalFactor": 2,
+                    "legendFormat": "Committed Memory",
+                    "refId": "B"
+                },
+                {
+                    "expr": "jvm_memory_limit_bytes",
+                    "format": "time_series",
+                    "instant": false,
+                    "interval": "",
+                    "intervalFactor": 2,
+                    "legendFormat": "Memory Limit",
+                    "refId": "C"
+                }
+            ],
+            "title": "JVM Memory Usage",
+            "type": "timeseries"
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "s",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            { "color": "green", "value": null },
+                            { "color": "red", "value": 0.5 }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+            "id": 6,
+            "options": {
+                "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+                "tooltip": { "mode": "single" }
+            },
+            "targets": [{
+                "exemplar": true,
+                "expr": "histogram_quantile(0.95, sum(rate(jvm_gc_duration_seconds_bucket[1m])) by (le))",
+                "format": "time_series",
+                "instant": false,
+                "interval": "",
+                "intervalFactor": 2,
+                "legendFormat": "95th Percentile",
+                "refId": "A"
+            }],
+            "title": "JVM GC Duration 95th Percentile",
+            "type": "timeseries"
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "none",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            { "color": "green", "value": null },
+                            { "color": "red", "value": 200 }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+            "id": 7,
+            "options": {
+                "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+                "tooltip": { "mode": "single" }
+            },
+            "targets": [{
+                "expr": "jvm_thread_count",
+                "format": "time_series",
+                "instant": false,
+                "interval": "",
+                "intervalFactor": 2,
+                "legendFormat": "{{instance}}",
+                "refId": "A"
+            }],
+            "title": "JVM Thread Count",
+            "type": "timeseries"
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "none",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            { "color": "green", "value": null },
+                            { "color": "red", "value": 1000 }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+            "id": 8,
+            "options": {
+                "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+                "tooltip": { "mode": "single" }
+            },
+            "targets": [{
+                "expr": "jvm_class_count",
+                "format": "time_series",
+                "instant": false,
+                "interval": "",
+                "intervalFactor": 2,
+                "legendFormat": "Class Count",
+                "refId": "A"
+            }],
+            "title": "JVM Class Count",
+            "type": "timeseries"
+        }
+    ],
+    "refresh": "5s",
+    "schemaVersion": 37,
+    "style": "dark",
+    "tags": [],
+    "templating": { "list": [] },
+    "time": { "from": "now-15m", "to": "now" },
+    "timepicker": {},
+    "timezone": "",
+    "title": "Service Health and JVM Metrics",
+    "uid": "service-health-jvm-metrics",
+    "version": 1,
+    "options": {
+        "exemplars": {
+            "enabled": true
+        }
+    }
+}
