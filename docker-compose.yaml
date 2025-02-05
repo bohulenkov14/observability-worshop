@@ -77,6 +77,22 @@ services:
     ports:
       - "3000:3000"
 
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: userdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d userdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   user-service:
     build:
       context: ./src/user-service
@@ -96,11 +112,28 @@ services:
       - OTEL_METRIC_EXPORT_INTERVAL=10000
       - OTEL_IMR_EXPORT_INTERVAL=10000
       - OTEL_INSTRUMENTATION_JVM_METRICS_ENABLED=true
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=userdb
+      - DB_USER=user
+      - DB_PASSWORD=password
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
-      - tempo
-      - prometheus
-      - loki
-      - otel-collector
+      postgres:
+        condition: service_healthy
+      tempo:
+        condition: service_started
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+      otel-collector:
+        condition: service_started
     networks:
       - default
 
@@ -124,11 +157,16 @@ services:
       - OTEL_IMR_EXPORT_INTERVAL=10000
       - OTEL_INSTRUMENTATION_JVM_METRICS_ENABLED=true
     depends_on:
-      - tempo
-      - prometheus
-      - loki
-      - otel-collector
-      - user-service
+      user-service:
+        condition: service_healthy
+      tempo:
+        condition: service_started
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+      otel-collector:
+        condition: service_started
     networks:
       - default
   loki:
@@ -138,3 +176,6 @@ services:
     volumes:
       - ./loki-config.yaml:/etc/loki/local-config.yaml
     command: -config.file=/etc/loki/local-config.yaml
+
+volumes:
+  postgres_data:

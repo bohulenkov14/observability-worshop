@@ -34,11 +34,22 @@ export default function() {
     });
     check(createUserRes, { 'user created': (r) => r.status === 201 });
 
+    // Extract the user ID from the response
+    let userId;
+    try {
+        const responseBody = JSON.parse(createUserRes.body);
+        userId = responseBody.data.id; // Assuming the response includes the UUID in data.id
+        console.log(`Created user with ID: ${userId}`);
+    } catch (e) {
+        console.error('Failed to parse user creation response:', e);
+        return;
+    }
+
     sleep(1);
 
     // 2. Top up the user's account
     const topUpData = {
-        userId: userData.username,
+        userId: userId, // Use the UUID from user creation
         amount: Math.floor(Math.random() * 1000) + 100
     };
     const topUpRes = http.post(`${BASE_URL}/user/topup`, JSON.stringify(topUpData), {
@@ -49,7 +60,7 @@ export default function() {
     sleep(1);
 
     // 3. Create a transaction
-    const txData = generateTransaction(userData.username);
+    const txData = generateTransaction(userId); // Use the UUID here as well
     const createTxRes = http.post(`${BASE_URL}/transaction/create`, JSON.stringify(txData), {
         headers: { 'Content-Type': 'application/json' },
     });

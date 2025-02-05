@@ -5,9 +5,13 @@ RUN gradle clean shadowJar --no-daemon
 
 FROM eclipse-temurin:21-jre-jammy
 EXPOSE 8080
-RUN mkdir /app
+RUN mkdir /app && \
+    apt-get update && \
+    apt-get install -y curl && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /home/gradle/src/build/libs/UserService.jar /app/user-service.jar
-COPY src/main/resources/logback.xml /app/logback.xml
+COPY --from=build /home/gradle/src/src/main/resources/application.yaml /app/application.yaml
+COPY --from=build /home/gradle/src/src/main/resources/logback.xml /app/logback.xml
 ENV LOG4J_FORMAT_MSG_NO_LOOKUPS=true
-ENTRYPOINT ["java", "-Dlog4j2.configurationFile=/app/log4j2.xml", "-javaagent:/app/opentelemetry-javaagent.jar", "-jar", "/app/user-service.jar"]
+ENTRYPOINT ["java", "-Dlog4j2.configurationFile=/app/log4j2.xml", "-Dconfig.file=/app/application.yaml", "-javaagent:/app/opentelemetry-javaagent.jar", "-jar", "/app/user-service.jar"]
