@@ -25,7 +25,7 @@ kotlin {
 }
 
 application {
-    mainClass = "com.example.PublicApiKt"
+    mainClass = "com.example.UserServiceKt"
 }
 
 tasks {
@@ -72,7 +72,6 @@ dependencies {
     implementation("org.slf4j:slf4j-api:2.0.16")
     implementation("ch.qos.logback:logback-classic:1.4.14")
     implementation("net.logstash.logback:logstash-logback-encoder:7.4")
-    implementation("org.http4k:http4k-client-okhttp")
     testImplementation("org.http4k:http4k-testing-approval")
     testImplementation("org.http4k:http4k-testing-hamkrest")
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.11.4")

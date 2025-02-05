@@ -2,7 +2,6 @@ package com.example
 
 import com.example.formats.JacksonMessage
 import com.example.formats.jacksonMessageLens
-import org.http4k.client.OkHttp
 import org.http4k.core.*
 import org.http4k.core.Method.GET
 import org.http4k.core.Method.POST
@@ -24,70 +23,52 @@ import org.slf4j.LoggerFactory
 // Data classes for request payloads
 data class CreateUserRequest(val username: String, val email: String)
 data class TopUpRequest(val userId: String, val amount: Double)
-data class CreateTransactionRequest(val userId: String, val transactionAmount: Double, val description: String)
 data class ApiResponse<T>(val status: String, val data: T? = null, val message: String? = null)
 
-private val log = LoggerFactory.getLogger("PublicApi")
-private val client = OkHttp()
-private const val USER_SERVICE_URL = "http://user-service:8080"
+private val log = LoggerFactory.getLogger("UserService")
 
 inline fun <reified T> apiResponseLens() = Body.auto<ApiResponse<T>>().toLens()
-
-fun proxyRequest(request: Request, path: String): Response {
-    val proxyRequest = request.uri(Uri.of("$USER_SERVICE_URL$path"))
-    log.info("Proxying request to user-service: ${proxyRequest.uri}")
-    return client(proxyRequest)
-}
 
 fun main() {
     // Lenses for JSON binding
     val createUserLens = Body.auto<CreateUserRequest>().toLens()
     val topUpLens = Body.auto<TopUpRequest>().toLens()
-    val createTransactionLens = Body.auto<CreateTransactionRequest>().toLens()    
 
     val app: HttpHandler = routes(
         "/" bind GET to {
             log.info("Received request to welcome endpoint")
-            val response = ApiResponse<Unit>(status = "success", message = "Welcome to the Public API Gateway")
+            val response = ApiResponse<Unit>(status = "success", message = "Welcome to the User Service")
             Response(OK).with(apiResponseLens<Unit>() of response)
         },
         
         "/user/create" bind POST to { req ->
-            log.info("Routing create user request to user-service")
-            proxyRequest(req, "/user/create")
-        },
-
-        "/user/topup" bind POST to { req ->
-            log.info("Routing top-up request to user-service")
-            proxyRequest(req, "/user/topup")
-        },
-
-        "/transaction/create" bind POST to { req ->
-            val txReq = createTransactionLens(req)
-            log.info("Creating transaction - user_id: {}, amount: {}, description: {}, event: {}", 
-                txReq.userId, 
-                txReq.transactionAmount, 
-                txReq.description, 
-                "transaction_create"
+            val createUserReq = createUserLens(req)
+            log.info("Creating user - username: {}, email: {}, event: {}", 
+                createUserReq.username, 
+                createUserReq.email, 
+                "user_create"
             )
             val response = ApiResponse(
                 status = "success",
-                data = txReq,
-                message = "Transaction created successfully"
+                data = createUserReq,
+                message = "User created successfully"
             )
-            Response(CREATED).with(apiResponseLens<CreateTransactionRequest>() of response)
+            Response(CREATED).with(apiResponseLens<CreateUserRequest>() of response)
         },
 
-        "/ping" bind GET to {
-            Response(OK).body("pong")
-        },
-
-        "/formats/json/jackson" bind GET to {
-            Response(OK).with(jacksonMessageLens of JacksonMessage("Barry", "Hello there!"))
-        },
-
-        "/opentelemetrymetrics" bind GET to {
-            Response(OK).body("Example metrics route for PublicApi")
+        "/user/topup" bind POST to { req ->
+            val topUpReq = topUpLens(req)
+            log.info("Processing top-up - user_id: {}, amount: {}, event: {}", 
+                topUpReq.userId, 
+                topUpReq.amount, 
+                "user_topup"
+            )
+            val response = ApiResponse(
+                status = "success",
+                data = topUpReq,
+                message = "Top-up processed successfully"
+            )
+            Response(OK).with(apiResponseLens<TopUpRequest>() of response)
         }
     )
 

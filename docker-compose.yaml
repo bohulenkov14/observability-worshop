@@ -77,6 +77,33 @@ services:
     ports:
       - "3000:3000"
 
+  user-service:
+    build:
+      context: ./src/user-service
+      dockerfile: Dockerfile
+    ports:
+      - "8080"
+    volumes:
+      - ./otel-agent/opentelemetry-javaagent.jar:/app/opentelemetry-javaagent.jar
+    environment:
+      - JAVA_OPTS=-Xmx512m
+      - OTEL_SERVICE_NAME=user-service
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_METRIC_EXPORT_INTERVAL=10000
+      - OTEL_IMR_EXPORT_INTERVAL=10000
+      - OTEL_INSTRUMENTATION_JVM_METRICS_ENABLED=true
+    depends_on:
+      - tempo
+      - prometheus
+      - loki
+      - otel-collector
+    networks:
+      - default
+
   public-api:
     build:
       context: ./src/public-api
@@ -101,6 +128,7 @@ services:
       - prometheus
       - loki
       - otel-collector
+      - user-service
     networks:
       - default
   loki:
