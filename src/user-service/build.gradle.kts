@@ -25,7 +25,7 @@ kotlin {
 }
 
 application {
-    mainClass = "com.example.UserServiceKt"
+    mainClass = "com.example.ApplicationKt"
 }
 
 tasks {
