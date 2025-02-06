@@ -282,5 +282,41 @@ services:
     networks:
       - default
 
+  currency-exchange:
+    build:
+      context: ./src/currency-exchange-service
+      dockerfile: Dockerfile
+    environment:
+      - JAVA_OPTS=-Xmx512m
+      - OTEL_SERVICE_NAME=currency-exchange
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_METRIC_EXPORT_INTERVAL=10000
+      - OTEL_IMR_EXPORT_INTERVAL=10000
+      - OTEL_INSTRUMENTATION_JVM_METRICS_ENABLED=true
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=userdb
+      - DB_USER=user
+      - DB_PASSWORD=password
+    volumes:
+      - ./otel-agent/opentelemetry-javaagent.jar:/app/opentelemetry-javaagent.jar
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    networks:
+      - default
+
 volumes:
   postgres_data:

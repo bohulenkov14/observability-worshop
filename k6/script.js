@@ -17,12 +17,15 @@ function generateUser() {
     };
 }
 
-// Helper function to generate random transaction data
+// Helper function to generate random transaction data with extended currency support
 function generateTransaction(userId) {
+    const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY'];
+    const currency = currencies[Math.floor(Math.random() * currencies.length)];
     return {
         userId: userId,
         amount: Math.floor(Math.random() * 100) + 1,
-        description: `Test transaction at ${new Date().toISOString()}`
+        description: `Test transaction at ${new Date().toISOString()}`,
+        currency: currency
     };
 }
 

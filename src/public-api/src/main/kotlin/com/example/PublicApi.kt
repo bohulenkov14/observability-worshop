@@ -1,7 +1,5 @@
 package com.example
 
-import com.example.formats.JacksonMessage
-import com.example.formats.jacksonMessageLens
 import org.http4k.client.OkHttp
 import org.http4k.core.*
 import org.http4k.core.Method.GET
@@ -95,10 +93,6 @@ fun main() {
 
         "/ping" bind GET to {
             Response(OK).body("pong")
-        },
-
-        "/formats/json/jackson" bind GET to {
-            Response(OK).with(jacksonMessageLens of JacksonMessage("Barry", "Hello there!"))
         },
 
         "/opentelemetrymetrics" bind GET to {

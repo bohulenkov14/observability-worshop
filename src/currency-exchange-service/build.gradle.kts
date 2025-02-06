@@ -82,23 +82,8 @@ dependencies {
             exclude(group = "org.apache.logging.log4j")
         }
     }
-
-    // Database
-    implementation("org.jetbrains.exposed:exposed-core:0.48.0")
-    implementation("org.jetbrains.exposed:exposed-dao:0.48.0")
-    implementation("org.jetbrains.exposed:exposed-jdbc:0.48.0")
-    implementation("org.jetbrains.exposed:exposed-java-time:0.48.0")
-    implementation("org.postgresql:postgresql:42.7.2")
-    
     // Configuration
     implementation("com.sksamuel.hoplite:hoplite-core:2.7.5")
     implementation("com.sksamuel.hoplite:hoplite-yaml:2.7.5")
-
-    // Kafka
-    implementation("org.apache.kafka:kafka-clients:3.6.0")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.3")
-
-    // HTTP client
-    implementation("org.http4k:http4k-client-okhttp")
 }
 
