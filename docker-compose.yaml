@@ -224,5 +224,63 @@ services:
       - ./loki-config.yaml:/etc/loki/local-config.yaml
     command: -config.file=/etc/loki/local-config.yaml
 
+  kafka:
+    image: observability-workshop-kafka:latest
+    container_name: kafka
+    build:
+      context: .
+      dockerfile: kafka/Dockerfile
+    deploy:
+      resources:
+        limits:
+          memory: 600M
+    restart: unless-stopped
+    environment:
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_HEAP_OPTS=-Xmx400m -Xms400m
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+      - OTEL_RESOURCE_ATTRIBUTES
+      - OTEL_SERVICE_NAME=kafka
+    healthcheck:
+      test: nc -z kafka 9092
+      start_period: 10s
+      interval: 5s
+      timeout: 10s
+      retries: 10
+    volumes:
+      - ./otel-agent/opentelemetry-javaagent.jar:/tmp/opentelemetry-javaagent.jar
+    depends_on:
+      otel-collector:
+        condition: service_started
+    networks:
+      - default
+
+  fraud-detection:
+    build:
+      context: ./src/fraud-detection-service
+      dockerfile: Dockerfile
+    environment:
+      - KAFKA_ADDR=kafka:9092
+      - JAVA_OPTS=-Xmx512m
+      - OTEL_SERVICE_NAME=fraud-detection
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_METRIC_EXPORT_INTERVAL=10000
+      - OTEL_IMR_EXPORT_INTERVAL=10000
+      - OTEL_INSTRUMENTATION_JVM_METRICS_ENABLED=true
+    volumes:
+      - ./otel-agent/opentelemetry-javaagent.jar:/app/opentelemetry-javaagent.jar
+    depends_on:
+      kafka:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    networks:
+      - default
+
 volumes:
   postgres_data:

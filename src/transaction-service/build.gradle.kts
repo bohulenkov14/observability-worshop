@@ -93,5 +93,9 @@ dependencies {
     // Configuration
     implementation("com.sksamuel.hoplite:hoplite-core:2.7.5")
     implementation("com.sksamuel.hoplite:hoplite-yaml:2.7.5")
+
+    // Kafka
+    implementation("org.apache.kafka:kafka-clients:3.6.0")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.3")
 }
 
