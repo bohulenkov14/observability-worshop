@@ -17,6 +17,7 @@ import org.http4k.filter.OpenTelemetryTracing
 import org.http4k.filter.ServerFilters
 import org.http4k.routing.bind
 import org.http4k.routing.routes
+import org.http4k.routing.path
 import org.http4k.server.Jetty
 import org.http4k.server.asServer
 import org.http4k.format.Jackson.auto
@@ -31,20 +32,21 @@ data class ApiResponse<T>(val status: String, val data: T? = null, val message: 
 private val log = LoggerFactory.getLogger("PublicApi")
 private val client = OkHttp()
 private const val USER_SERVICE_URL = "http://user-service:8080"
+private const val TRANSACTION_SERVICE_URL = "http://transaction-service:8080"
 
 inline fun <reified T> apiResponseLens() = Body.auto<ApiResponse<T>>().toLens()
 
-fun proxyRequest(request: Request, path: String): Response {
-    val proxyRequest = request.uri(Uri.of("$USER_SERVICE_URL$path"))
+fun proxyRequest(request: Request, baseUrl: String, path: String): Response {
+    val proxyRequest = request.uri(Uri.of("$baseUrl$path"))
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
     
-    log.info("Proxying request to user-service: ${proxyRequest.uri}")
+    log.info("Proxying request to: ${proxyRequest.uri}")
     return try {
         client(proxyRequest)
     } catch (e: Exception) {
-        log.error("Error proxying request to user-service: ${e.message}", e)
-        Response(INTERNAL_SERVER_ERROR)
+        log.error("Error proxying request: ${e.message}", e)
+        Response(Status.INTERNAL_SERVER_ERROR)
             .with(apiResponseLens<Unit>() of ApiResponse(
                 status = "error",
                 message = "Internal server error"
@@ -67,28 +69,28 @@ fun main() {
         
         "/user/create" bind POST to { req ->
             log.info("Routing create user request to user-service")
-            proxyRequest(req, "/user/create")
+            proxyRequest(req, USER_SERVICE_URL, "/user/create")
         },
 
         "/user/topup" bind POST to { req ->
             log.info("Routing top-up request to user-service")
-            proxyRequest(req, "/user/topup")
+            proxyRequest(req, USER_SERVICE_URL, "/user/topup")
         },
 
         "/transaction/create" bind POST to { req ->
-            val txReq = createTransactionLens(req)
-            log.info("Creating transaction - user_id: {}, amount: {}, description: {}, event: {}", 
-                txReq.userId, 
-                txReq.transactionAmount, 
-                txReq.description, 
-                "transaction_create"
+            log.info("Routing create transaction request to transaction-service")
+            proxyRequest(req, TRANSACTION_SERVICE_URL, "/transaction/create")
+        },
+
+        "/transaction/user/{userId}" bind GET to { req ->
+            val userId = req.path("userId") ?: return@to Response(Status.BAD_REQUEST).with(
+                apiResponseLens<Unit>() of ApiResponse(
+                    status = "error",
+                    message = "Missing user ID"
+                )
             )
-            val response = ApiResponse(
-                status = "success",
-                data = txReq,
-                message = "Transaction created successfully"
-            )
-            Response(CREATED).with(apiResponseLens<CreateTransactionRequest>() of response)
+            log.info("Routing get user transactions request to transaction-service for user: {}", userId)
+            proxyRequest(req, TRANSACTION_SERVICE_URL, "/transaction/user/$userId")
         },
 
         "/ping" bind GET to {

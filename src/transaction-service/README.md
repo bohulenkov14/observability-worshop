@@ -1,0 +1,7 @@
+# PublicApi
+
+## Package
+```
+./gradlew shadowJar
+```
+
