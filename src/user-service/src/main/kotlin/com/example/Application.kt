@@ -3,6 +3,7 @@ package com.example
 import com.example.config.AppConfig
 import com.example.repository.UserRepository
 import com.example.service.UserService
+import com.example.service.AccountFrozenException
 import com.sksamuel.hoplite.ConfigLoader
 import com.example.formats.JacksonMessage
 import com.example.formats.jacksonMessageLens
@@ -12,6 +13,7 @@ import org.http4k.core.Method.POST
 import org.http4k.core.Status.Companion.OK
 import org.http4k.core.Status.Companion.CREATED
 import org.http4k.core.Status.Companion.NOT_FOUND
+import org.http4k.core.Status.Companion.BAD_REQUEST
 import org.http4k.core.then
 import org.http4k.core.with
 import org.http4k.filter.DebuggingFilters.PrintRequest
@@ -31,7 +33,8 @@ import java.math.BigDecimal
 data class CreateUserRequest(val username: String, val email: String)
 data class TopUpRequest(val userId: String, val amount: Double)
 data class DeductRequest(val userId: String, val amount: Double)
-data class ApiResponse<T>(val status: String, val data: T? = null, val message: String? = null)
+data class FreezeAccountRequest(val userId: String)
+data class ApiResponse<T>(val status: String, val data: T? = null, val message: String? = null, val errorCode: String? = null)
 data class CreateUserResponse(
     val id: String,
     val username: String,
@@ -60,6 +63,7 @@ fun main() {
     val createUserLens = Body.auto<CreateUserRequest>().toLens()
     val topUpLens = Body.auto<TopUpRequest>().toLens()
     val deductLens = Body.auto<DeductRequest>().toLens()
+    val freezeAccountLens = Body.auto<FreezeAccountRequest>().toLens()
 
     val app: HttpHandler = routes(
         "/health" bind GET to {
@@ -93,42 +97,76 @@ fun main() {
 
         "/user/topup" bind POST to { req ->
             val topUpReq = topUpLens(req)
-            val updatedUser = userService.topUpBalance(
-                topUpReq.userId,
-                BigDecimal.valueOf(topUpReq.amount)
-            )
-
-            if (updatedUser != null) {
-                Response(OK).with(apiResponseLens<TopUpRequest>() of ApiResponse(
-                    status = "success",
-                    data = topUpReq,
-                    message = "Top-up processed successfully"
-                ))
-            } else {
+            val user = userService.topUpBalance(topUpReq.userId, BigDecimal.valueOf(topUpReq.amount))
+            
+            if (user == null) {
                 Response(NOT_FOUND).with(apiResponseLens<Unit>() of ApiResponse(
                     status = "error",
                     message = "User not found"
+                ))
+            } else {
+                Response(OK).with(apiResponseLens<Unit>() of ApiResponse(
+                    status = "success",
+                    message = "Balance updated successfully"
                 ))
             }
         },
 
         "/user/deduct" bind POST to { req ->
             val deductReq = deductLens(req)
-            val updatedUser = userService.deductBalance(
-                deductReq.userId,
-                BigDecimal.valueOf(deductReq.amount)
-            )
-
-            if (updatedUser != null) {
-                Response(OK).with(apiResponseLens<DeductRequest>() of ApiResponse(
-                    status = "success",
-                    data = deductReq,
-                    message = "Deduction processed successfully"
+            try {
+                val user = userService.deductBalance(deductReq.userId, BigDecimal.valueOf(deductReq.amount))
+                
+                if (user == null) {
+                    Response(NOT_FOUND).with(apiResponseLens<Unit>() of ApiResponse(
+                        status = "error",
+                        message = "User not found"
+                    ))
+                } else {
+                    Response(OK).with(apiResponseLens<Unit>() of ApiResponse(
+                        status = "success",
+                        message = "Balance updated successfully"
+                    ))
+                }
+            } catch (e: AccountFrozenException) {
+                Response(BAD_REQUEST).with(apiResponseLens<Unit>() of ApiResponse(
+                    status = "error",
+                    message = e.message,
+                    errorCode = "ACCOUNT_FROZEN"
                 ))
-            } else {
+            }
+        },
+
+        "/user/freeze" bind POST to { req ->
+            val freezeReq = freezeAccountLens(req)
+            val user = userService.freezeAccount(freezeReq.userId)
+            
+            if (user == null) {
                 Response(NOT_FOUND).with(apiResponseLens<Unit>() of ApiResponse(
                     status = "error",
                     message = "User not found"
+                ))
+            } else {
+                Response(OK).with(apiResponseLens<Unit>() of ApiResponse(
+                    status = "success",
+                    message = "Account frozen successfully"
+                ))
+            }
+        },
+
+        "/user/unfreeze" bind POST to { req ->
+            val freezeReq = freezeAccountLens(req)
+            val user = userService.unfreezeAccount(freezeReq.userId)
+            
+            if (user == null) {
+                Response(NOT_FOUND).with(apiResponseLens<Unit>() of ApiResponse(
+                    status = "error",
+                    message = "User not found"
+                ))
+            } else {
+                Response(OK).with(apiResponseLens<Unit>() of ApiResponse(
+                    status = "success",
+                    message = "Account unfrozen successfully"
                 ))
             }
         }
@@ -140,7 +178,6 @@ fun main() {
         .then(ServerFilters.OpenTelemetryMetrics.RequestTimer())
         .then(app)
 
-    val server = printingApp.asServer(Jetty(8080)).start()
-
-    println("Server started on " + server.port())
+    val server = printingApp.asServer(Jetty(8080))
+    server.start()
 }

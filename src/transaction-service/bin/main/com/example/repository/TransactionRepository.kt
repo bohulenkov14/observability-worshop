@@ -17,7 +17,7 @@ object Transactions : UUIDTable("transactions") {
     val amount = decimal("amount", 19, 4)
     val description = varchar("description", 255)
     val createdAt = timestamp("created_at")
-    val status = enumerationByName("status", 20, TransactionStatus::class)
+    val status = enumerationByName("status", 30, TransactionStatus::class)
 }
 
 class TransactionRepository {

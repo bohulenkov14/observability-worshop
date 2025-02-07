@@ -41,6 +41,7 @@ class TransactionService(
     private val tracer = GlobalOpenTelemetry.getTracer("transaction-service")
     private val propagator = GlobalOpenTelemetry.getPropagators().textMapPropagator
     private val conversionResponseLens = Body.auto<ApiResponse<CurrencyConversionResponse>>().toLens()
+    private val apiResponseLens = Body.auto<ApiResponse<Unit>>().toLens()
     private val userServiceClient = OkHttp()
 
     companion object {
@@ -83,7 +84,7 @@ class TransactionService(
                             
                             val transaction = transactionRepository.updateStatus(
                                 transactionId,
-                                TransactionStatus.APPROVED
+                                TransactionStatus.PENDING_BALANCE_DEDUCTION
                             )
 
                             if (transaction != null) {
@@ -94,14 +95,22 @@ class TransactionService(
                                         .with(Body.auto<DeductRequest>().toLens() of deductRequest)
                                 )
 
-                                if (response.status != Status.OK) {
-                                    log.error("Failed to deduct amount from user balance: {}", response.status)
-                                } else {
-                                    log.info("Successfully deducted amount from user balance for transaction: {}", transactionId)
+                                when (response.status) {
+                                    Status.OK -> {
+                                        transactionRepository.updateStatus(transactionId, TransactionStatus.PROCESSED)
+                                        log.info("Successfully deducted amount from user balance for transaction: {}", transactionId)
+                                    }
+                                    Status.BAD_REQUEST -> {
+                                        val apiResponse = apiResponseLens(response)
+                                        if (apiResponse.errorCode == "ACCOUNT_FROZEN") {
+                                            log.info("Account frozen, cannot deduct amount for transaction: {}", transactionId)
+                                        }
+                                    }
+                                    else -> {
+                                        log.error("Failed to deduct amount from user balance: {}", response.status)
+                                    }
                                 }
                             }
-                            
-                            log.info("Updated transaction {} status to APPROVED", transactionId)
                         } catch (e: Exception) {
                             log.error("Error processing fraud result: {}", e.message, e)
                         }
@@ -194,7 +203,12 @@ class TransactionService(
     }
 }
 
-data class ApiResponse<T>(val status: String, val data: T? = null, val message: String? = null)
+data class ApiResponse<T>(
+    val status: String, 
+    val data: T? = null, 
+    val message: String? = null,
+    val errorCode: String? = null
+)
 
 data class CurrencyConversionResponse(
     val fromCurrency: String,

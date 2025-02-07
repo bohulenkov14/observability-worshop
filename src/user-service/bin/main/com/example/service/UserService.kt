@@ -5,6 +5,8 @@ import com.example.repository.UserRepository
 import org.slf4j.LoggerFactory
 import java.math.BigDecimal
 
+class AccountFrozenException(userId: String) : RuntimeException("Account is frozen for user: $userId")
+
 class UserService(private val userRepository: UserRepository) {
     private val log = LoggerFactory.getLogger(UserService::class.java)
 
@@ -33,7 +35,22 @@ class UserService(private val userRepository: UserRepository) {
             return null
         }
 
+        if (user.isFrozen) {
+            log.error("Cannot deduct from frozen account - user_id: {}", userId)
+            throw AccountFrozenException(userId)
+        }
+
         val newBalance = user.balance - amount
         return userRepository.updateBalance(userId, newBalance)
+    }
+
+    fun freezeAccount(userId: String): User? {
+        log.info("Freezing account - user_id: {}", userId)
+        return userRepository.setFrozenStatus(userId, true)
+    }
+
+    fun unfreezeAccount(userId: String): User? {
+        log.info("Unfreezing account - user_id: {}", userId)
+        return userRepository.setFrozenStatus(userId, false)
     }
 } 

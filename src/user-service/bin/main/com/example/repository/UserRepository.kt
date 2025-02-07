@@ -14,6 +14,7 @@ object Users : UUIDTable("users") {
     val username = varchar("username", 255).uniqueIndex()
     val email = varchar("email", 255).uniqueIndex()
     val balance = decimal("balance", 19, 4)
+    val isFrozen = bool("is_frozen").default(false)
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
 }
@@ -34,6 +35,7 @@ class UserRepository {
             it[Users.username] = username
             it[Users.email] = email
             it[balance] = BigDecimal.ZERO
+            it[isFrozen] = false
             it[createdAt] = now
             it[updatedAt] = now
         }
@@ -43,6 +45,7 @@ class UserRepository {
             username = username,
             email = email,
             balance = BigDecimal.ZERO,
+            isFrozen = false,
             createdAt = now,
             updatedAt = now
         )
@@ -65,11 +68,23 @@ class UserRepository {
         findById(id)
     }
 
+    fun setFrozenStatus(id: String, frozen: Boolean): User? = transaction {
+        val now = Instant.now()
+        
+        Users.update({ Users.id eq UUID.fromString(id) }) {
+            it[isFrozen] = frozen
+            it[updatedAt] = now
+        }
+
+        findById(id)
+    }
+
     private fun ResultRow.toUser() = User(
         id = this[Users.id].toString(),
         username = this[Users.username],
         email = this[Users.email],
         balance = this[Users.balance],
+        isFrozen = this[Users.isFrozen],
         createdAt = this[Users.createdAt],
         updatedAt = this[Users.updatedAt]
     )

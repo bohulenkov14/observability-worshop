@@ -8,6 +8,7 @@ data class User(
     val username: String,
     val email: String,
     val balance: BigDecimal,
+    val isFrozen: Boolean = false,
     val createdAt: Instant,
     val updatedAt: Instant
 ) 
