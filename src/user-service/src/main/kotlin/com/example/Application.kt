@@ -30,6 +30,7 @@ import java.math.BigDecimal
 // Data classes for request payloads
 data class CreateUserRequest(val username: String, val email: String)
 data class TopUpRequest(val userId: String, val amount: Double)
+data class DeductRequest(val userId: String, val amount: Double)
 data class ApiResponse<T>(val status: String, val data: T? = null, val message: String? = null)
 data class CreateUserResponse(
     val id: String,
@@ -58,6 +59,7 @@ fun main() {
     // Lenses for JSON binding
     val createUserLens = Body.auto<CreateUserRequest>().toLens()
     val topUpLens = Body.auto<TopUpRequest>().toLens()
+    val deductLens = Body.auto<DeductRequest>().toLens()
 
     val app: HttpHandler = routes(
         "/health" bind GET to {
@@ -101,6 +103,27 @@ fun main() {
                     status = "success",
                     data = topUpReq,
                     message = "Top-up processed successfully"
+                ))
+            } else {
+                Response(NOT_FOUND).with(apiResponseLens<Unit>() of ApiResponse(
+                    status = "error",
+                    message = "User not found"
+                ))
+            }
+        },
+
+        "/user/deduct" bind POST to { req ->
+            val deductReq = deductLens(req)
+            val updatedUser = userService.deductBalance(
+                deductReq.userId,
+                BigDecimal.valueOf(deductReq.amount)
+            )
+
+            if (updatedUser != null) {
+                Response(OK).with(apiResponseLens<DeductRequest>() of ApiResponse(
+                    status = "success",
+                    data = deductReq,
+                    message = "Deduction processed successfully"
                 ))
             } else {
                 Response(NOT_FOUND).with(apiResponseLens<Unit>() of ApiResponse(

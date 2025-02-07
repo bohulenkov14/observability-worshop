@@ -24,4 +24,16 @@ class UserService(private val userRepository: UserRepository) {
         val newBalance = user.balance + amount
         return userRepository.updateBalance(userId, newBalance)
     }
+
+    fun deductBalance(userId: String, amount: BigDecimal): User? {
+        log.info("Processing deduction - user_id: {}, amount: {}", userId, amount)
+        
+        val user = userRepository.findById(userId) ?: run {
+            log.error("User not found - user_id: {}", userId)
+            return null
+        }
+
+        val newBalance = user.balance - amount
+        return userRepository.updateBalance(userId, newBalance)
+    }
 } 

@@ -4,6 +4,7 @@ import com.example.domain.Transaction
 import com.example.domain.TransactionStatus
 import com.example.repository.TransactionRepository
 import org.http4k.core.*
+import org.http4k.client.OkHttp
 import org.slf4j.LoggerFactory
 import java.math.BigDecimal
 import org.apache.kafka.clients.producer.KafkaProducer
@@ -40,6 +41,7 @@ class TransactionService(
     private val tracer = GlobalOpenTelemetry.getTracer("transaction-service")
     private val propagator = GlobalOpenTelemetry.getPropagators().textMapPropagator
     private val conversionResponseLens = Body.auto<ApiResponse<CurrencyConversionResponse>>().toLens()
+    private val userServiceClient = OkHttp()
 
     companion object {
         const val FRAUD_CHECK_TOPIC = "transactions.fraud.check"
@@ -79,10 +81,25 @@ class TransactionService(
                             val transactionId = record.key()
                             log.info("Received fraud check result for transaction: {}", transactionId)
                             
-                            val updatedTransaction = transactionRepository.updateStatus(
+                            val transaction = transactionRepository.updateStatus(
                                 transactionId,
                                 TransactionStatus.APPROVED
                             )
+
+                            if (transaction != null) {
+                                // Deduct amount from user's balance
+                                val deductRequest = DeductRequest(transaction.userId, transaction.amount)
+                                val response = userServiceClient(
+                                    Request(Method.POST, "http://user-service:8080/user/deduct")
+                                        .with(Body.auto<DeductRequest>().toLens() of deductRequest)
+                                )
+
+                                if (response.status != Status.OK) {
+                                    log.error("Failed to deduct amount from user balance: {}", response.status)
+                                } else {
+                                    log.info("Successfully deducted amount from user balance for transaction: {}", transactionId)
+                                }
+                            }
                             
                             log.info("Updated transaction {} status to APPROVED", transactionId)
                         } catch (e: Exception) {
@@ -185,4 +202,9 @@ data class CurrencyConversionResponse(
     val amount: BigDecimal,
     val convertedAmount: BigDecimal,
     val rate: BigDecimal
+)
+
+data class DeductRequest(
+    val userId: String,
+    val amount: BigDecimal
 )
