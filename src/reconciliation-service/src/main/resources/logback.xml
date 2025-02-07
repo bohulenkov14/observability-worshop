@@ -4,13 +4,13 @@
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
             <includeMdcKeyName>trace_id</includeMdcKeyName>
             <includeMdcKeyName>span_id</includeMdcKeyName>
-            <customFields>{"service.name":"user-service"}</customFields>
+            <customFields>{"service.name":"reconciliation-service"}</customFields>
         </encoder>
     </appender>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-            <customFields>{"service.name":"user-service"}</customFields>
+            <customFields>{"service.name":"reconciliation-service"}</customFields>
         </encoder>
     </appender>
 
