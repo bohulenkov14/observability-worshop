@@ -85,8 +85,6 @@ services:
       POSTGRES_PASSWORD: password
     ports:
       - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U user -d userdb"]
       interval: 5s
@@ -318,5 +316,52 @@ services:
     networks:
       - default
 
-volumes:
-  postgres_data:
+  reconciliation-service:
+    build:
+      context: ./src/reconciliation-service
+      dockerfile: Dockerfile
+    ports:
+      - "8080"
+    volumes:
+      - ./otel-agent/opentelemetry-javaagent.jar:/app/opentelemetry-javaagent.jar
+    environment:
+      - JAVA_OPTS=-Xmx512m
+      - OTEL_SERVICE_NAME=reconciliation-service
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_METRIC_EXPORT_INTERVAL=10000
+      - OTEL_IMR_EXPORT_INTERVAL=10000
+      - OTEL_INSTRUMENTATION_JVM_METRICS_ENABLED=true
+      - KAFKA_ADDR=kafka:9092
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=userdb
+      - DB_USER=user
+      - DB_PASSWORD=password
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      tempo:
+        condition: service_started
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+    networks:
+      - default
+
+networks:
+  default:
