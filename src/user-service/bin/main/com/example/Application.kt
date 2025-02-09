@@ -26,6 +26,7 @@ import org.http4k.format.Jackson.auto
 import org.jetbrains.exposed.sql.Database
 import org.slf4j.LoggerFactory
 import java.math.BigDecimal
+import java.time.Instant
 
 // Data classes for request payloads
 data class CreateUserRequest(val username: String, val email: String)
@@ -37,7 +38,11 @@ data class CreateUserResponse(
     val username: String,
     val email: String
 )
-data class UserBalance(val userId: String, val balance: BigDecimal)
+data class UserBalance(
+    val userId: String, 
+    val balance: BigDecimal,
+    val lastUpdatedAt: Instant
+)
 
 private val log = LoggerFactory.getLogger("UserService")
 
@@ -155,7 +160,8 @@ fun main() {
                     status = "success",
                     data = UserBalance(
                         userId = user.id,
-                        balance = user.balance
+                        balance = user.balance,
+                        lastUpdatedAt = user.updatedAt
                     ),
                     message = "Balance retrieved successfully"
                 ))
