@@ -15,32 +15,8 @@ class UserService(private val userRepository: UserRepository) {
         return userRepository.create(username, email)
     }
 
-    fun topUpBalance(userId: String, amount: BigDecimal): User? {
-        log.info("Processing top-up - user_id: {}, amount: {}", userId, amount)
-        
-        val user = userRepository.findById(userId) ?: run {
-            log.error("User not found - user_id: {}", userId)
-            return null
-        }
-
-        val newBalance = user.balance + amount
-        return userRepository.updateBalance(userId, newBalance)
-    }
-
-    fun deductBalance(userId: String, amount: BigDecimal): User? {
-        log.info("Processing deduction - user_id: {}, amount: {}", userId, amount)
-        
-        val user = userRepository.findById(userId) ?: run {
-            log.error("User not found - user_id: {}", userId)
-            return null
-        }
-
-        if (user.isFrozen) {
-            log.error("Cannot deduct from frozen account - user_id: {}", userId)
-            throw AccountFrozenException(userId)
-        }
-
-        val newBalance = user.balance - amount
+    fun updateBalance(userId: String, newBalance: BigDecimal): User? {
+        log.info("Updating balance - user_id: {}, new_balance: {}", userId, newBalance)
         return userRepository.updateBalance(userId, newBalance)
     }
 
@@ -52,5 +28,10 @@ class UserService(private val userRepository: UserRepository) {
     fun unfreezeAccount(userId: String): User? {
         log.info("Unfreezing account - user_id: {}", userId)
         return userRepository.setFrozenStatus(userId, false)
+    }
+
+    fun findUser(userId: String): User? {
+        log.info("Finding user - user_id: {}", userId)
+        return userRepository.findById(userId)
     }
 } 

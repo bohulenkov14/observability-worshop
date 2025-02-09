@@ -3,6 +3,8 @@ package com.example
 import com.example.config.AppConfig
 import com.example.repository.TransactionRepository
 import com.example.service.TransactionService
+import com.example.domain.TransactionStatus
+import com.example.domain.TransactionType
 import com.sksamuel.hoplite.ConfigLoader
 import org.http4k.core.*
 import org.http4k.core.Method.GET
@@ -41,7 +43,9 @@ data class TransactionResponse(
     val userId: String,
     val amount: Double,
     val description: String,
-    val createdAt: String
+    val createdAt: String,
+    val status: TransactionStatus,
+    val type: TransactionType
 )
 
 data class ApiResponse<T>(val status: String, val data: T? = null, val message: String? = null)
@@ -74,9 +78,32 @@ fun main() {
             ))
         },
 
-        "/transaction/create" bind POST to { req ->
+        "/transaction/top-up" bind POST to { req ->
             val createReq = createTransactionLens(req)
-            val transaction = transactionService.createTransaction(
+            val transaction = transactionService.createTopUp(
+                createReq.userId,
+                BigDecimal.valueOf(createReq.amount)
+            )
+            
+            val response = ApiResponse(
+                status = "success",
+                data = TransactionResponse(
+                    id = transaction.id,
+                    userId = transaction.userId,
+                    amount = transaction.amount.toDouble(),
+                    description = transaction.description,
+                    createdAt = transaction.createdAt.toString(),
+                    status = transaction.status,
+                    type = transaction.type
+                ),
+                message = "Top-up transaction created successfully"
+            )
+            Response(CREATED).with(apiResponseLens<TransactionResponse>() of response)
+        },
+
+        "/transaction/purchase" bind POST to { req ->
+            val createReq = createTransactionLens(req)
+            val transaction = transactionService.createPurchase(
                 createReq.userId,
                 BigDecimal.valueOf(createReq.amount),
                 createReq.description,
@@ -90,9 +117,11 @@ fun main() {
                     userId = transaction.userId,
                     amount = transaction.amount.toDouble(),
                     description = transaction.description,
-                    createdAt = transaction.createdAt.toString()
+                    createdAt = transaction.createdAt.toString(),
+                    status = transaction.status,
+                    type = transaction.type
                 ),
-                message = "Transaction created successfully"
+                message = "Purchase transaction created successfully"
             )
             Response(CREATED).with(apiResponseLens<TransactionResponse>() of response)
         },
@@ -115,7 +144,9 @@ fun main() {
                         userId = tx.userId,
                         amount = tx.amount.toDouble(),
                         description = tx.description,
-                        createdAt = tx.createdAt.toString()
+                        createdAt = tx.createdAt.toString(),
+                        status = tx.status,
+                        type = tx.type
                     )
                 },
                 message = "Transactions retrieved successfully"

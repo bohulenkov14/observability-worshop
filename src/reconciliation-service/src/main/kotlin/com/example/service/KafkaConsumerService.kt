@@ -5,6 +5,7 @@ import com.example.domain.TransactionStatus
 import com.example.repository.ReconciliationRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -20,6 +21,7 @@ class KafkaConsumerService(
     private val consumer: KafkaConsumer<String, String>
     private val objectMapper = ObjectMapper().apply {
         registerModule(JavaTimeModule())
+        registerKotlinModule()
     }
 
     companion object {
@@ -49,27 +51,41 @@ class KafkaConsumerService(
                     val records = consumer.poll(Duration.ofMillis(100))
                     for (record in records) {
                         try {
+                            log.info("Received message from topic: {}, key: {}", record.topic(), record.key())
                             val transaction = objectMapper.readValue(record.value(), Transaction::class.java)
+                            log.info(
+                                "Processing transaction - ID: {}, Type: {}, Amount: {}, Status: {}", 
+                                transaction.id,
+                                transaction.type,
+                                transaction.amount,
+                                transaction.status
+                            )
+
                             when (record.topic()) {
                                 FRAUD_CHECK_TOPIC -> {
-                                    log.info("Received transaction for reconciliation: {}", transaction.id)
+                                    log.info("Recording new transaction for reconciliation: {}", transaction.id)
                                     reconciliationRepository.recordTransaction(transaction)
                                 }
                                 FRAUD_RESULT_TOPIC -> {
-                                    log.info("Received fraud check result for transaction: {}", transaction.id)
+                                    log.info("Updating transaction status after fraud check: {}", transaction.id)
                                     reconciliationRepository.updateTransactionStatus(
                                         transaction.id,
-                                        TransactionStatus.APPROVED
+                                        TransactionStatus.PENDING_BALANCE_DEDUCTION
                                     )
                                 }
                             }
                         } catch (e: Exception) {
-                            log.error("Error processing record: {}", e.message, e)
+                            log.error(
+                                "Error processing record from topic {}: {}", 
+                                record.topic(), 
+                                e.message, 
+                                e
+                            )
                         }
                     }
                 }
             } catch (e: Exception) {
-                log.error("Error in consumer: {}", e.message, e)
+                log.error("Fatal error in consumer: {}", e.message, e)
             }
         }
     }

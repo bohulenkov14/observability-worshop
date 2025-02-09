@@ -17,15 +17,23 @@ function generateUser() {
     };
 }
 
-// Helper function to generate random transaction data with extended currency support
-function generateTransaction(userId) {
+// Helper function to generate random amount
+function generateAmount() {
+    return Math.floor(Math.random() * 1000) + 100;
+}
+
+// Helper function to generate random currency
+function generateCurrency() {
     const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY'];
-    const currency = currencies[Math.floor(Math.random() * currencies.length)];
+    return currencies[Math.floor(Math.random() * currencies.length)];
+}
+
+// Helper function to generate random purchase data
+function generatePurchase() {
     return {
-        userId: userId,
-        amount: Math.floor(Math.random() * 100) + 1,
-        description: `Test transaction at ${new Date().toISOString()}`,
-        currency: currency
+        amount: generateAmount(),
+        description: `Purchase at ${new Date().toISOString()}`,
+        currency: generateCurrency()
     };
 }
 
@@ -41,7 +49,7 @@ export default function() {
     let userId;
     try {
         const responseBody = JSON.parse(createUserRes.body);
-        userId = responseBody.data.id; // Assuming the response includes the UUID in data.id
+        userId = responseBody.data.id;
         console.log(`Created user with ID: ${userId}`);
     } catch (e) {
         console.error('Failed to parse user creation response:', e);
@@ -52,27 +60,27 @@ export default function() {
 
     // 2. Top up the user's account
     const topUpData = {
-        userId: userId, // Use the UUID from user creation
-        amount: Math.floor(Math.random() * 1000) + 100
+        amount: generateAmount(),
+        currency: generateCurrency()
     };
-    const topUpRes = http.post(`${BASE_URL}/user/topup`, JSON.stringify(topUpData), {
+    const topUpRes = http.post(`${BASE_URL}/user/${userId}/top-up`, JSON.stringify(topUpData), {
         headers: { 'Content-Type': 'application/json' },
     });
-    check(topUpRes, { 'top-up successful': (r) => r.status === 200 });
+    check(topUpRes, { 'top-up successful': (r) => r.status === 201 });
 
     sleep(1);
 
-    // 3. Create a transaction
-    const txData = generateTransaction(userId);
-    const createTxRes = http.post(`${BASE_URL}/transaction/create`, JSON.stringify(txData), {
+    // 3. Make a purchase
+    const purchaseData = generatePurchase();
+    const purchaseRes = http.post(`${BASE_URL}/user/${userId}/purchase`, JSON.stringify(purchaseData), {
         headers: { 'Content-Type': 'application/json' },
     });
-    check(createTxRes, { 'transaction created': (r) => r.status === 201 });
+    check(purchaseRes, { 'purchase successful': (r) => r.status === 201 });
 
     sleep(1);
 
     // 4. Get user transactions
-    const getTxRes = http.get(`${BASE_URL}/transaction/user/${userId}`, {
+    const getTxRes = http.get(`${BASE_URL}/user/${userId}/transactions`, {
         headers: { 'Content-Type': 'application/json' },
     });
     check(getTxRes, { 'get transactions successful': (r) => r.status === 200 });

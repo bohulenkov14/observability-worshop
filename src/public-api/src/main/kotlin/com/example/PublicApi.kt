@@ -23,8 +23,18 @@ import org.slf4j.LoggerFactory
 
 // Data classes for request payloads
 data class CreateUserRequest(val username: String, val email: String)
-data class TopUpRequest(val userId: String, val amount: Double)
-data class CreateTransactionRequest(val userId: String, val transactionAmount: Double, val description: String)
+data class TopUpRequest(val amount: Double, val currency: String = "USD")
+data class PurchaseRequest(
+    val amount: Double,
+    val description: String,
+    val currency: String = "USD"
+)
+data class CreateTransactionRequest(
+    val userId: String,
+    val amount: Double,
+    val description: String,
+    val currency: String? = "USD"
+)
 data class ApiResponse<T>(val status: String, val data: T? = null, val message: String? = null)
 
 private val log = LoggerFactory.getLogger("PublicApi")
@@ -56,7 +66,7 @@ fun main() {
     // Lenses for JSON binding
     val createUserLens = Body.auto<CreateUserRequest>().toLens()
     val topUpLens = Body.auto<TopUpRequest>().toLens()
-    val createTransactionLens = Body.auto<CreateTransactionRequest>().toLens()    
+    val purchaseLens = Body.auto<PurchaseRequest>().toLens()
 
     val app: HttpHandler = routes(
         "/" bind GET to {
@@ -70,17 +80,55 @@ fun main() {
             proxyRequest(req, USER_SERVICE_URL, "/user/create")
         },
 
-        "/user/topup" bind POST to { req ->
-            log.info("Routing top-up request to user-service")
-            proxyRequest(req, USER_SERVICE_URL, "/user/topup")
+        "/user/{userId}/top-up" bind POST to { req ->
+            val userId = req.path("userId") ?: return@to Response(Status.BAD_REQUEST).with(
+                apiResponseLens<Unit>() of ApiResponse(
+                    status = "error",
+                    message = "Missing user ID"
+                )
+            )
+            
+            val topUpReq = topUpLens(req)
+            log.info("Routing top-up request to transaction-service for user: {}", userId)
+            
+            proxyRequest(
+                Request(Method.POST, TRANSACTION_SERVICE_URL + "/transaction/top-up")
+                    .with(Body.auto<CreateTransactionRequest>().toLens() of CreateTransactionRequest(
+                        userId = userId,
+                        amount = topUpReq.amount,
+                        description = "Account balance top-up",
+                        currency = topUpReq.currency
+                    )),
+                TRANSACTION_SERVICE_URL,
+                "/transaction/top-up"
+            )
         },
 
-        "/transaction/create" bind POST to { req ->
-            log.info("Routing create transaction request to transaction-service")
-            proxyRequest(req, TRANSACTION_SERVICE_URL, "/transaction/create")
+        "/user/{userId}/purchase" bind POST to { req ->
+            val userId = req.path("userId") ?: return@to Response(Status.BAD_REQUEST).with(
+                apiResponseLens<Unit>() of ApiResponse(
+                    status = "error",
+                    message = "Missing user ID"
+                )
+            )
+            
+            val purchaseReq = purchaseLens(req)
+            log.info("Routing purchase request to transaction-service for user: {}", userId)
+            
+            proxyRequest(
+                Request(Method.POST, TRANSACTION_SERVICE_URL + "/transaction/purchase")
+                    .with(Body.auto<CreateTransactionRequest>().toLens() of CreateTransactionRequest(
+                        userId = userId,
+                        amount = purchaseReq.amount,
+                        description = purchaseReq.description,
+                        currency = purchaseReq.currency
+                    )),
+                TRANSACTION_SERVICE_URL,
+                "/transaction/purchase"
+            )
         },
 
-        "/transaction/user/{userId}" bind GET to { req ->
+        "/user/{userId}/transactions" bind GET to { req ->
             val userId = req.path("userId") ?: return@to Response(Status.BAD_REQUEST).with(
                 apiResponseLens<Unit>() of ApiResponse(
                     status = "error",

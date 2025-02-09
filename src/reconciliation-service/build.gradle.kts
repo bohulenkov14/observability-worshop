@@ -60,6 +60,19 @@ dependencies {
     implementation("org.apache.kafka:kafka-clients:3.6.0")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.3")
 
+    // HTTP client
+    implementation(platform("org.http4k:http4k-bom:5.45.0.0"))
+    implementation("org.http4k:http4k-core")
+    implementation("org.http4k:http4k-client-okhttp")
+    implementation("org.http4k:http4k-format-jackson")
+
+    // OpenTelemetry
+    implementation("io.opentelemetry:opentelemetry-api:1.46.0")
+    implementation("io.opentelemetry:opentelemetry-sdk:1.46.0")
+    implementation("io.opentelemetry:opentelemetry-extension-annotations:1.18.0")
+    implementation("io.opentelemetry:opentelemetry-semconv:1.30.1-alpha")
+    implementation("io.opentelemetry:opentelemetry-context:1.46.0")
+
     // Testing
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.11.4")

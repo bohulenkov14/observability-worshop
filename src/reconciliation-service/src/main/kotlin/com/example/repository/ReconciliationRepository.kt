@@ -2,6 +2,7 @@ package com.example.repository
 
 import com.example.domain.Transaction
 import com.example.domain.TransactionStatus
+import com.example.domain.TransactionType
 import org.jetbrains.exposed.dao.id.UUIDTable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -18,9 +19,12 @@ object ReconciliationRecords : UUIDTable("reconciliation_records") {
     val amount = decimal("amount", 19, 4)
     val description = varchar("description", 255)
     val createdAt = timestamp("created_at")
-    val status = enumerationByName("status", 20, TransactionStatus::class)
-    val reconciliationStatus = varchar("reconciliation_status", 20).default("PENDING")
+    val status = enumerationByName("status", 50, TransactionStatus::class)
+    val reconciliationStatus = varchar("reconciliation_status", 50).default("PENDING")
     val lastCheckedAt = timestamp("last_checked_at").nullable()
+    val type = enumerationByName("type", 50, TransactionType::class)
+    val reconciled = bool("reconciled").default(false)
+    val isDiscrepancy = bool("is_discrepancy").default(false)
 }
 
 class ReconciliationRepository {
@@ -41,7 +45,17 @@ class ReconciliationRepository {
             it[description] = transaction.description
             it[createdAt] = transaction.createdAt
             it[status] = transaction.status
+            it[type] = transaction.type
+            it[reconciled] = false
+            it[isDiscrepancy] = false
         }
+        log.info(
+            "Recorded transaction for reconciliation - ID: {}, Type: {}, Amount: {}, Status: {}", 
+            transaction.id,
+            transaction.type,
+            transaction.amount,
+            transaction.status
+        )
     }
 
     fun updateTransactionStatus(transactionId: String, newStatus: TransactionStatus) = transaction {
@@ -53,15 +67,16 @@ class ReconciliationRepository {
 
     fun findUnreconciledTransactions(): List<UnreconciledTransaction> = transaction {
         ReconciliationRecords
-            .select { ReconciliationRecords.reconciliationStatus eq "PENDING" }
+            .select { (ReconciliationRecords.reconciled eq false) and (ReconciliationRecords.isDiscrepancy eq false) }
             .map {
                 UnreconciledTransaction(
-                    id = it[ReconciliationRecords.id].toString(),
                     transactionId = it[ReconciliationRecords.transactionId],
                     userId = it[ReconciliationRecords.userId],
                     amount = it[ReconciliationRecords.amount],
+                    description = it[ReconciliationRecords.description],
+                    createdAt = it[ReconciliationRecords.createdAt],
                     status = it[ReconciliationRecords.status],
-                    createdAt = it[ReconciliationRecords.createdAt]
+                    type = it[ReconciliationRecords.type]
                 )
             }
     }
@@ -82,10 +97,11 @@ class ReconciliationRepository {
 }
 
 data class UnreconciledTransaction(
-    val id: String,
     val transactionId: String,
     val userId: String,
     val amount: BigDecimal,
+    val description: String,
+    val createdAt: Instant,
     val status: TransactionStatus,
-    val createdAt: Instant
+    val type: TransactionType
 ) 

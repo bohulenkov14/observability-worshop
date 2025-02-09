@@ -59,8 +59,9 @@ class UserRepository {
 
     fun updateBalance(id: String, newBalance: BigDecimal): User? = transaction {
         val now = Instant.now()
+        val userId = UUID.fromString(id)
         
-        Users.update({ Users.id eq UUID.fromString(id) }) {
+        Users.update({ Users.id eq userId }) {
             it[balance] = newBalance
             it[updatedAt] = now
         }

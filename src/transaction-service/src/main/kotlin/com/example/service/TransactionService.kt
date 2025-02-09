@@ -2,6 +2,7 @@ package com.example.service
 
 import com.example.domain.Transaction
 import com.example.domain.TransactionStatus
+import com.example.domain.TransactionType
 import com.example.repository.TransactionRepository
 import org.http4k.core.*
 import org.http4k.client.OkHttp
@@ -68,7 +69,6 @@ class TransactionService(
             subscribe(listOf(FRAUD_RESULT_TOPIC))
         }
 
-        // Start consumer in background thread
         startFraudResultConsumer()
     }
 
@@ -88,26 +88,29 @@ class TransactionService(
                             )
 
                             if (transaction != null) {
-                                // Deduct amount from user's balance
-                                val deductRequest = DeductRequest(transaction.userId, transaction.amount)
-                                val response = userServiceClient(
-                                    Request(Method.POST, "http://user-service:8080/user/deduct")
-                                        .with(Body.auto<DeductRequest>().toLens() of deductRequest)
-                                )
+                                // Update user's balance based on transaction type
+                                when (transaction.type) {
+                                    TransactionType.TOP_UP -> {
+                                        val response = userServiceClient(
+                                            Request(Method.POST, "http://user-service:8080/user/balance/update")
+                                                .with(Body.auto<UpdateBalanceRequest>().toLens() of UpdateBalanceRequest(
+                                                    userId = transaction.userId,
+                                                    newBalance = getCurrentBalance(transaction.userId)?.plus(transaction.amount) ?: transaction.amount
+                                                ))
+                                        )
 
-                                when (response.status) {
-                                    Status.OK -> {
-                                        transactionRepository.updateStatus(transactionId, TransactionStatus.PROCESSED)
-                                        log.info("Successfully deducted amount from user balance for transaction: {}", transactionId)
+                                        handleBalanceUpdateResponse(response, transactionId)
                                     }
-                                    Status.BAD_REQUEST -> {
-                                        val apiResponse = apiResponseLens(response)
-                                        if (apiResponse.errorCode == "ACCOUNT_FROZEN") {
-                                            log.info("Account frozen, cannot deduct amount for transaction: {}", transactionId)
-                                        }
-                                    }
-                                    else -> {
-                                        log.error("Failed to deduct amount from user balance: {}", response.status)
+                                    TransactionType.PURCHASE -> {
+                                        val response = userServiceClient(
+                                            Request(Method.POST, "http://user-service:8080/user/balance/update")
+                                                .with(Body.auto<UpdateBalanceRequest>().toLens() of UpdateBalanceRequest(
+                                                    userId = transaction.userId,
+                                                    newBalance = getCurrentBalance(transaction.userId)?.minus(transaction.amount) ?: -transaction.amount
+                                                ))
+                                        )
+
+                                        handleBalanceUpdateResponse(response, transactionId)
                                     }
                                 }
                             }
@@ -122,13 +125,58 @@ class TransactionService(
         }
     }
 
+    private fun getCurrentBalance(userId: String): BigDecimal? {
+        val response = userServiceClient(
+            Request(Method.GET, "http://user-service:8080/user/balance/$userId")
+        )
+
+        if (response.status != Status.OK) {
+            log.error("Failed to get user balance. Status: {}", response.status)
+            return null
+        }
+
+        return Body.auto<ApiResponse<UserBalance>>().toLens()(response).data?.balance
+    }
+
+    private fun handleBalanceUpdateResponse(response: Response, transactionId: String) {
+        when (response.status) {
+            Status.OK -> {
+                transactionRepository.updateStatus(transactionId, TransactionStatus.PROCESSED)
+                log.info("Successfully processed transaction: {}", transactionId)
+            }
+            Status.BAD_REQUEST -> {
+                val apiResponse = apiResponseLens(response)
+                if (apiResponse.errorCode == "ACCOUNT_FROZEN") {
+                    log.info("Account frozen, cannot process transaction: {}", transactionId)
+                }
+            }
+            else -> {
+                log.error("Failed to update balance for transaction {}: {}", transactionId, response.status)
+            }
+        }
+    }
+
     private val headersSetter = TextMapSetter<MutableList<RecordHeader>> { headers, key, value ->
         requireNotNull(headers) { "Headers list cannot be null" }
         headers.add(RecordHeader(key, value.toByteArray()))
     }
 
-    fun createTransaction(userId: String, amount: BigDecimal, description: String, currency: String = "USD"): Transaction {
-        log.info("Creating transaction - user_id: {}, amount: {}, currency: {}", userId, amount, currency)
+    fun createTopUp(userId: String, amount: BigDecimal): Transaction {
+        log.info("Creating top-up - user_id: {}, amount: {}", userId, amount)
+        
+        val transaction = transactionRepository.create(
+            userId = userId,
+            amount = amount,
+            description = "TOP-UP: Account balance top-up",
+            type = TransactionType.TOP_UP
+        )
+        
+        publishToFraudCheck(transaction)
+        return transaction
+    }
+
+    fun createPurchase(userId: String, amount: BigDecimal, description: String, currency: String = "USD"): Transaction {
+        log.info("Creating purchase - user_id: {}, amount: {}, currency: {}", userId, amount, currency)
         
         // Convert currency if not USD
         val usdAmount = if (currency != "USD") {
@@ -152,7 +200,13 @@ class TransactionService(
             amount
         }
 
-        val transaction = transactionRepository.create(userId, usdAmount, description)
+        val transaction = transactionRepository.create(
+            userId = userId,
+            amount = usdAmount,
+            description = description,
+            type = TransactionType.PURCHASE
+        )
+        
         publishToFraudCheck(transaction)
         return transaction
     }
@@ -218,7 +272,12 @@ data class CurrencyConversionResponse(
     val rate: BigDecimal
 )
 
-data class DeductRequest(
+data class UpdateBalanceRequest(
     val userId: String,
-    val amount: BigDecimal
+    val newBalance: BigDecimal
+)
+
+data class UserBalance(
+    val userId: String,
+    val balance: BigDecimal
 )

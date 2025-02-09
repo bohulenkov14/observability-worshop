@@ -1,12 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    <appender name="OTLP" class="io.opentelemetry.instrumentation.logback.v1_0.OpenTelemetryAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>trace_id</includeMdcKeyName>
+            <includeMdcKeyName>span_id</includeMdcKeyName>
+            <customFields>{"service.name":"fraud-detection-service"}</customFields>
+        </encoder>
+    </appender>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"service.name":"fraud-detection-service"}</customFields>
         </encoder>
     </appender>
 
     <root level="INFO">
-        <appender-ref ref="STDOUT" />
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="OTLP" />
     </root>
+
+    <!-- Suppress Kafka logs -->
+    <logger name="org.apache.kafka" level="WARN"/>
+    <logger name="kafka" level="WARN"/>
+    <logger name="state.change.logger" level="WARN"/>
+    <logger name="org.apache.zookeeper" level="WARN"/>
+
+    <!-- Other common logs to suppress -->
+    <logger name="org.eclipse.jetty" level="WARN"/>
+    <logger name="org.apache.http" level="WARN"/>
 </configuration> 

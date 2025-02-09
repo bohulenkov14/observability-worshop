@@ -2,6 +2,7 @@ package com.example.repository
 
 import com.example.domain.Transaction
 import com.example.domain.TransactionStatus
+import com.example.domain.TransactionType
 import org.jetbrains.exposed.dao.id.UUIDTable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -11,17 +12,20 @@ import org.slf4j.LoggerFactory
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 object Transactions : UUIDTable("transactions") {
     val userId = varchar("user_id", 36)
     val amount = decimal("amount", 19, 4)
     val description = varchar("description", 255)
+    val type = enumerationByName("type", 20, TransactionType::class)
     val createdAt = timestamp("created_at")
     val status = enumerationByName("status", 30, TransactionStatus::class)
 }
 
 class TransactionRepository {
     private val log = LoggerFactory.getLogger(TransactionRepository::class.java)
+    private val transactions = ConcurrentHashMap<String, Transaction>()
 
     init {
         transaction {
@@ -29,45 +33,39 @@ class TransactionRepository {
         }
     }
 
-    fun create(userId: String, amount: BigDecimal, description: String): Transaction = transaction {
-        val id = UUID.randomUUID()
-        val now = Instant.now()
-        
-        Transactions.insert {
-            it[Transactions.id] = id
-            it[Transactions.userId] = userId
-            it[Transactions.amount] = amount
-            it[Transactions.description] = description
-            it[createdAt] = now
-            it[status] = TransactionStatus.PENDING_FRAUD_CHECK
-        }
-
-        Transaction(
-            id = id.toString(),
+    fun create(
+        userId: String,
+        amount: BigDecimal,
+        description: String,
+        type: TransactionType
+    ): Transaction {
+        val transaction = Transaction(
+            id = UUID.randomUUID().toString(),
             userId = userId,
             amount = amount,
             description = description,
-            createdAt = now,
-            status = TransactionStatus.PENDING_FRAUD_CHECK
+            status = TransactionStatus.PENDING_FRAUD_CHECK,
+            type = type,
+            createdAt = Instant.now()
         )
+        transactions[transaction.id] = transaction
+        return transaction
     }
 
-    fun updateStatus(transactionId: String, newStatus: TransactionStatus): Transaction? = transaction {
-        val uuid = UUID.fromString(transactionId)
-        Transactions.update({ Transactions.id eq uuid }) {
-            it[status] = newStatus
+    fun updateStatus(transactionId: String, newStatus: TransactionStatus): Transaction? {
+        return transactions[transactionId]?.let { transaction ->
+            val updatedTransaction = transaction.copy(status = newStatus)
+            transactions[transactionId] = updatedTransaction
+            updatedTransaction
         }
-        
-        Transactions
-            .select { Transactions.id eq uuid }
-            .map { it.toTransaction() }
-            .singleOrNull()
     }
 
-    fun findByUserId(userId: String): List<Transaction> = transaction {
-        Transactions
-            .select { Transactions.userId eq userId }
-            .map { it.toTransaction() }
+    fun findByUserId(userId: String): List<Transaction> {
+        return transactions.values.filter { it.userId == userId }
+    }
+
+    fun findById(id: String): Transaction? {
+        return transactions[id]
     }
 
     private fun ResultRow.toTransaction() = Transaction(
@@ -75,6 +73,7 @@ class TransactionRepository {
         userId = this[Transactions.userId],
         amount = this[Transactions.amount],
         description = this[Transactions.description],
+        type = this[Transactions.type],
         createdAt = this[Transactions.createdAt],
         status = this[Transactions.status]
     )
