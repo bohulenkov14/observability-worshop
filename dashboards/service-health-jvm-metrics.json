@@ -37,57 +37,28 @@
                 },
                 "overrides": []
             },
-            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
             "id": 1,
             "options": {
-                "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] },
-                "tooltip": { "mode": "single" }
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "right",
+                    "calcs": ["lastNotNull", "max"],
+                    "showLegend": true
+                },
+                "tooltip": { "mode": "multi" }
             },
             "targets": [{
                 "exemplar": true,
-                "expr": "rate(http_server_request_count_total[1m])",
+                "expr": "sum(rate(http_server_request_count_total{job=~\"$service\"}[1m])) by (job, path, method, status)",
                 "format": "time_series",
                 "instant": false,
                 "interval": "",
                 "intervalFactor": 2,
-                "legendFormat": "{{job}}",
+                "legendFormat": "{{job}} [{{method}}] {{path}} ({{status}})",
                 "refId": "A"
             }],
             "title": "HTTP Request Rate",
-            "type": "timeseries"
-        },
-        {
-            "datasource": "Prometheus",
-            "fieldConfig": {
-                "defaults": {
-                    "unit": "s",
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            { "color": "green", "value": null },
-                            { "color": "red", "value": 1 }
-                        ]
-                    }
-                },
-                "overrides": []
-            },
-            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-            "id": 2,
-            "options": {
-                "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-                "tooltip": { "mode": "single" }
-            },
-            "targets": [{
-                "exemplar": true,
-                "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[1m])) by (le))",
-                "format": "time_series",
-                "instant": false,
-                "interval": "",
-                "intervalFactor": 2,
-                "legendFormat": "95th Percentile",
-                "refId": "A"
-            }],
-            "title": "HTTP Request 95th Percentile Duration (s)",
             "type": "timeseries"
         },
         {
@@ -105,20 +76,25 @@
                 },
                 "overrides": []
             },
-            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
             "id": 3,
             "options": {
-                "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-                "tooltip": { "mode": "single" }
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "right",
+                    "calcs": ["lastNotNull", "max"],
+                    "showLegend": true
+                },
+                "tooltip": { "mode": "multi" }
             },
             "targets": [{
                 "exemplar": true,
-                "expr": "histogram_quantile(0.95, sum(rate(http_server_request_latency_milliseconds_bucket[1m])) by (le))",
+                "expr": "histogram_quantile(0.95, sum(rate(http_server_request_latency_milliseconds_bucket{job=~\"$service\"}[1m])) by (le, job, path, method))",
                 "format": "time_series",
                 "instant": false,
                 "interval": "",
                 "intervalFactor": 2,
-                "legendFormat": "95th Percentile",
+                "legendFormat": "{{job}} [{{method}}] {{path}}",
                 "refId": "A"
             }],
             "title": "HTTP Request 95th Percentile Latency (ms)",
@@ -139,19 +115,24 @@
                 },
                 "overrides": []
             },
-            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
             "id": 4,
             "options": {
-                "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-                "tooltip": { "mode": "single" }
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "right",
+                    "calcs": ["lastNotNull"],
+                    "showLegend": true
+                },
+                "tooltip": { "mode": "multi" }
             },
             "targets": [{
-                "expr": "avg(jvm_cpu_recent_utilization_ratio) by (instance)",
+                "expr": "avg(jvm_cpu_recent_utilization_ratio{job=~\"$service\"}) by (job)",
                 "format": "time_series",
                 "instant": false,
                 "interval": "",
                 "intervalFactor": 2,
-                "legendFormat": "{{instance}}",
+                "legendFormat": "{{job}}",
                 "refId": "A"
             }],
             "title": "JVM CPU Utilization",
@@ -172,38 +153,52 @@
                 },
                 "overrides": []
             },
-            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
             "id": 5,
             "options": {
-                "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-                "tooltip": { "mode": "single" }
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "right",
+                    "calcs": ["lastNotNull"],
+                    "showLegend": true
+                },
+                "tooltip": { "mode": "multi" }
             },
             "targets": [{
-                    "expr": "jvm_memory_used_bytes",
+                    "expr": "sum(jvm_memory_used_bytes{job=~\"$service\", jvm_memory_type=\"heap\"}) by (job)",
                     "format": "time_series",
                     "instant": false,
                     "interval": "",
                     "intervalFactor": 2,
-                    "legendFormat": "Used Memory",
+                    "legendFormat": "{{job}} - Heap Used",
                     "refId": "A"
                 },
                 {
-                    "expr": "jvm_memory_committed_bytes",
+                    "expr": "sum(jvm_memory_committed_bytes{job=~\"$service\", jvm_memory_type=\"heap\"}) by (job)",
                     "format": "time_series",
                     "instant": false,
                     "interval": "",
                     "intervalFactor": 2,
-                    "legendFormat": "Committed Memory",
+                    "legendFormat": "{{job}} - Heap Committed",
                     "refId": "B"
                 },
                 {
-                    "expr": "jvm_memory_limit_bytes",
+                    "expr": "sum(jvm_memory_used_bytes{job=~\"$service\", jvm_memory_type=\"non_heap\"}) by (job)",
                     "format": "time_series",
                     "instant": false,
                     "interval": "",
                     "intervalFactor": 2,
-                    "legendFormat": "Memory Limit",
+                    "legendFormat": "{{job}} - Non-Heap Used",
                     "refId": "C"
+                },
+                {
+                    "expr": "sum(jvm_memory_committed_bytes{job=~\"$service\", jvm_memory_type=\"non_heap\"}) by (job)",
+                    "format": "time_series",
+                    "instant": false,
+                    "interval": "",
+                    "intervalFactor": 2,
+                    "legendFormat": "{{job}} - Non-Heap Committed",
+                    "refId": "D"
                 }
             ],
             "title": "JVM Memory Usage",
@@ -224,20 +219,25 @@
                 },
                 "overrides": []
             },
-            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
             "id": 6,
             "options": {
-                "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-                "tooltip": { "mode": "single" }
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "right",
+                    "calcs": ["lastNotNull"],
+                    "showLegend": true
+                },
+                "tooltip": { "mode": "multi" }
             },
             "targets": [{
                 "exemplar": true,
-                "expr": "histogram_quantile(0.95, sum(rate(jvm_gc_duration_seconds_bucket[1m])) by (le))",
+                "expr": "histogram_quantile(0.95, sum(rate(jvm_gc_duration_seconds_bucket{job=~\"$service\"}[1m])) by (le, job))",
                 "format": "time_series",
                 "instant": false,
                 "interval": "",
                 "intervalFactor": 2,
-                "legendFormat": "95th Percentile",
+                "legendFormat": "{{job}} - 95th Percentile",
                 "refId": "A"
             }],
             "title": "JVM GC Duration 95th Percentile",
@@ -258,19 +258,24 @@
                 },
                 "overrides": []
             },
-            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 },
             "id": 7,
             "options": {
-                "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-                "tooltip": { "mode": "single" }
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "right",
+                    "calcs": ["lastNotNull"],
+                    "showLegend": true
+                },
+                "tooltip": { "mode": "multi" }
             },
             "targets": [{
-                "expr": "jvm_thread_count",
+                "expr": "sum(jvm_thread_count{job=~\"$service\"}) by (job)",
                 "format": "time_series",
                 "instant": false,
                 "interval": "",
                 "intervalFactor": 2,
-                "legendFormat": "{{instance}}",
+                "legendFormat": "{{job}} - Total Threads",
                 "refId": "A"
             }],
             "title": "JVM Thread Count",
@@ -291,19 +296,24 @@
                 },
                 "overrides": []
             },
-            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 48 },
             "id": 8,
             "options": {
-                "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-                "tooltip": { "mode": "single" }
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "right",
+                    "calcs": ["lastNotNull"],
+                    "showLegend": true
+                },
+                "tooltip": { "mode": "multi" }
             },
             "targets": [{
-                "expr": "jvm_class_count",
+                "expr": "jvm_class_count{job=~\"$service\"}",
                 "format": "time_series",
                 "instant": false,
                 "interval": "",
                 "intervalFactor": 2,
-                "legendFormat": "Class Count",
+                "legendFormat": "{{job}}",
                 "refId": "A"
             }],
             "title": "JVM Class Count",
@@ -314,7 +324,29 @@
     "schemaVersion": 37,
     "style": "dark",
     "tags": [],
-    "templating": { "list": [] },
+    "templating": {
+        "list": [{
+            "current": {
+                "selected": false,
+                "text": "All",
+                "value": "$__all"
+            },
+            "datasource": "Prometheus",
+            "definition": "label_values(jvm_memory_used_bytes, job)",
+            "hide": 0,
+            "includeAll": true,
+            "label": "Service",
+            "multi": false,
+            "name": "service",
+            "options": [],
+            "query": "label_values(jvm_memory_used_bytes, job)",
+            "refresh": 2,
+            "regex": "",
+            "skipUrlSync": false,
+            "sort": 1,
+            "type": "query"
+        }]
+    },
     "time": { "from": "now-15m", "to": "now" },
     "timepicker": {},
     "timezone": "",
