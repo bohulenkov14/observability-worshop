@@ -14,4 +14,4 @@ COPY --from=build /home/gradle/src/build/libs/ReconciliationService.jar /app/rec
 COPY --from=build /home/gradle/src/src/main/resources/application.yaml /app/application.yaml
 COPY --from=build /home/gradle/src/src/main/resources/logback.xml /app/logback.xml
 ENV LOG4J_FORMAT_MSG_NO_LOOKUPS=true
-ENTRYPOINT ["java", "-Dlog4j2.configurationFile=/app/log4j2.xml", "-Dconfig.file=/app/application.yaml", "-javaagent:/app/opentelemetry-javaagent.jar", "-jar", "/app/reconciliation-service.jar"]
+ENTRYPOINT ["java",  "-Dconfig.file=/app/application.yaml", "-javaagent:/app/opentelemetry-javaagent.jar", "-jar", "/app/reconciliation-service.jar"]

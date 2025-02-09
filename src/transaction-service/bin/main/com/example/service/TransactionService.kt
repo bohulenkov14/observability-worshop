@@ -75,6 +75,7 @@ class TransactionService(
     private fun startFraudResultConsumer() {
         thread(start = true, name = "fraud-result-consumer") {
             try {
+                
                 while (true) {
                     val records = consumer.poll(Duration.ofMillis(100))
                     for (record in records) {

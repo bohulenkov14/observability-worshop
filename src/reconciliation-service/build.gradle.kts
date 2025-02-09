@@ -43,7 +43,6 @@ dependencies {
     // Logging
     implementation("org.slf4j:slf4j-api:2.0.16")
     implementation("ch.qos.logback:logback-classic:1.4.14")
-    implementation("net.logstash.logback:logstash-logback-encoder:7.4")
     
     // Database
     implementation("org.jetbrains.exposed:exposed-core:0.48.0")
@@ -65,16 +64,25 @@ dependencies {
     implementation("org.http4k:http4k-core")
     implementation("org.http4k:http4k-client-okhttp")
     implementation("org.http4k:http4k-format-jackson")
+    implementation("org.http4k:http4k-ops-opentelemetry")
 
     // OpenTelemetry
-    implementation("io.opentelemetry:opentelemetry-api:1.46.0")
-    implementation("io.opentelemetry:opentelemetry-sdk:1.46.0")
+    implementation("io.opentelemetry:opentelemetry-api:1.47.0")
+    implementation("io.opentelemetry:opentelemetry-sdk:1.47.0")
+    implementation("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:2.12.0")
+    implementation("io.opentelemetry.instrumentation:opentelemetry-instrumentation-annotations:2.12.0")
     implementation("io.opentelemetry:opentelemetry-extension-annotations:1.18.0")
     implementation("io.opentelemetry:opentelemetry-semconv:1.30.1-alpha")
-    implementation("io.opentelemetry:opentelemetry-context:1.46.0")
+    implementation("io.opentelemetry:opentelemetry-context:1.47.0")
 
     // Testing
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.11.4")
+
+    configurations {
+        all {
+            exclude(group = "org.apache.logging.log4j")
+        }
+    }
 }
 
