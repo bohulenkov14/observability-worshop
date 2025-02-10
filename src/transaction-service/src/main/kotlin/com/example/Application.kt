@@ -6,6 +6,9 @@ import com.example.service.TransactionService
 import com.example.domain.TransactionStatus
 import com.example.domain.TransactionType
 import com.sksamuel.hoplite.ConfigLoader
+import io.opentelemetry.api.common.AttributeKey
+import io.opentelemetry.api.common.Attributes
+import io.opentelemetry.api.trace.Span
 import org.http4k.core.*
 import org.http4k.core.Method.GET
 import org.http4k.core.Method.POST
@@ -80,6 +83,11 @@ fun main() {
 
         "/transaction/top-up" bind POST to { req ->
             val createReq = createTransactionLens(req)
+            val span = Span.current()
+            span.setAttribute("req.userId", createReq.userId)
+            span.setAttribute("req.amount", createReq.amount)
+            span.setAttribute("req.description", createReq.description)
+
             val transaction = transactionService.createTopUp(
                 createReq.userId,
                 BigDecimal.valueOf(createReq.amount)
@@ -103,6 +111,12 @@ fun main() {
 
         "/transaction/purchase" bind POST to { req ->
             val createReq = createTransactionLens(req)
+            val span = Span.current()
+            span.setAttribute("req.userId", createReq.userId)
+            span.setAttribute("req.amount", createReq.amount)
+            span.setAttribute("req.description", createReq.description)
+            span.setAttribute("req.currency", createReq.currency ?: "USD")
+
             val transaction = transactionService.createPurchase(
                 createReq.userId,
                 BigDecimal.valueOf(createReq.amount),
@@ -133,6 +147,9 @@ fun main() {
                     message = "Missing user ID"
                 )
             )
+
+            val span = Span.current()
+            span.setAttribute("req.userId", userId)
             
             val transactions = transactionService.getUserTransactions(userId)
             

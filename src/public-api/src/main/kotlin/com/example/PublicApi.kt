@@ -1,5 +1,8 @@
 package com.example
 
+import io.opentelemetry.api.common.AttributeKey
+import io.opentelemetry.api.common.Attributes
+import io.opentelemetry.api.trace.Span
 import org.http4k.client.OkHttp
 import org.http4k.core.*
 import org.http4k.core.Method.GET
@@ -77,6 +80,10 @@ fun main() {
         
         "/user/create" bind POST to { req ->
             log.info("Routing create user request to user-service")
+            val userCreateRequest = createUserLens(req)
+            val span = Span.current()
+            span.setAttribute("req.username", userCreateRequest.username)
+            span.setAttribute("req.email", userCreateRequest.email)
             proxyRequest(req, USER_SERVICE_URL, "/user/create")
         },
 
@@ -90,6 +97,11 @@ fun main() {
             
             val topUpReq = topUpLens(req)
             log.info("Routing top-up request to transaction-service for user: {}", userId)
+            val span = Span.current()
+            span.setAttribute("req.userId", userId)
+            span.setAttribute("req.amount", topUpReq.amount)
+            span.setAttribute("req.currency", topUpReq.currency)
+
             
             proxyRequest(
                 Request(Method.POST, TRANSACTION_SERVICE_URL + "/transaction/top-up")
@@ -113,6 +125,12 @@ fun main() {
             )
             
             val purchaseReq = purchaseLens(req)
+            val span = Span.current()
+            span.setAttribute("req.userId", userId)
+            span.setAttribute("req.amount", purchaseReq.amount)
+            span.setAttribute("req.description", purchaseReq.description)
+            span.setAttribute("req.currency", purchaseReq.currency)
+
             log.info("Routing purchase request to transaction-service for user: {}", userId)
             
             proxyRequest(
@@ -135,6 +153,9 @@ fun main() {
                     message = "Missing user ID"
                 )
             )
+            val span = Span.current()
+            span.setAttribute("req.userId", userId)
+
             log.info("Routing get user transactions request to transaction-service for user: {}", userId)
             proxyRequest(req, TRANSACTION_SERVICE_URL, "/transaction/user/$userId")
         },

@@ -2,6 +2,7 @@ package com.example
 
 import com.example.api.CurrencyExchangeApi
 import com.example.usecase.*
+import io.opentelemetry.api.GlobalOpenTelemetry
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.trace.Tracer
 import org.http4k.core.HttpHandler
@@ -18,7 +19,7 @@ private val log = LoggerFactory.getLogger("CurrencyExchangeService")
 
 fun main() {
     // Initialize OpenTelemetry
-    val openTelemetry: OpenTelemetry = initializeOpenTelemetry()
+    val openTelemetry: OpenTelemetry = GlobalOpenTelemetry.get()
     val tracer: Tracer = openTelemetry.getTracer("currency-exchange-service")
 
     // Initialize use cases
@@ -40,9 +41,4 @@ fun main() {
     // Start the server
     val server = printingApp.asServer(Jetty(8080)).start()
     log.info("Server started on port ${server.port()}")
-}
-
-private fun initializeOpenTelemetry(): OpenTelemetry {
-    // In a real application, this would be configured with proper exporters and samplers
-    return OpenTelemetry.noop()
 }

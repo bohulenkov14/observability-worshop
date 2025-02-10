@@ -17,6 +17,7 @@ import org.apache.kafka.common.header.internals.RecordHeader
 import org.apache.kafka.common.serialization.StringSerializer
 import org.apache.kafka.common.serialization.StringDeserializer
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.annotation.JsonAppend.Attr
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import io.opentelemetry.api.GlobalOpenTelemetry
 import io.opentelemetry.api.trace.Span
@@ -27,6 +28,8 @@ import io.opentelemetry.semconv.SemanticAttributes
 import io.opentelemetry.api.metrics.DoubleHistogram
 import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.common.Attributes
+import io.opentelemetry.api.trace.StatusCode
+import org.apache.kafka.clients.consumer.ConsumerRecord
 import java.util.Properties
 import org.http4k.format.Jackson.auto
 import java.time.Duration
@@ -119,50 +122,77 @@ class TransactionService(
                 while (true) {
                     val records = consumer.poll(Duration.ofMillis(100))
                     for (record in records) {
-                        try {
-                            val transactionId = record.key()
-                            log.info("Received fraud check result for transaction: {}", transactionId)
-                            
-                            val updatedTransaction = transactionRepository.updateStatus(
-                                transactionId,
-                                TransactionStatus.PENDING_BALANCE_DEDUCTION
-                            )
-
-                            if (updatedTransaction != null) {
-                                // Update user's balance based on transaction type
-                                when (updatedTransaction.type) {
-                                    TransactionType.TOP_UP -> {
-                                        val response = userServiceClient(
-                                            Request(Method.POST, "http://user-service:8080/user/balance/update")
-                                                .with(Body.auto<UpdateBalanceRequest>().toLens() of UpdateBalanceRequest(
-                                                    userId = updatedTransaction.userId,
-                                                    newBalance = getCurrentBalance(updatedTransaction.userId)?.plus(updatedTransaction.amount) ?: updatedTransaction.amount
-                                                ))
-                                        )
-
-                                        handleBalanceUpdateResponse(response, transactionId)
-                                    }
-                                    TransactionType.PURCHASE -> {
-                                        val response = userServiceClient(
-                                            Request(Method.POST, "http://user-service:8080/user/balance/update")
-                                                .with(Body.auto<UpdateBalanceRequest>().toLens() of UpdateBalanceRequest(
-                                                    userId = updatedTransaction.userId,
-                                                    newBalance = getCurrentBalance(updatedTransaction.userId)?.minus(updatedTransaction.amount) ?: -updatedTransaction.amount
-                                                ))
-                                        )
-
-                                        handleBalanceUpdateResponse(response, transactionId)
-                                    }
-                                }
-                            }
-                        } catch (e: Exception) {
-                            log.error("Error processing fraud result: {}", e.message, e)
-                        }
+                        processFraudCheckResult(record)
                     }
                 }
             } catch (e: Exception) {
                 log.error("Error in fraud result consumer: {}", e.message, e)
             }
+        }
+    }
+
+    private fun processFraudCheckResult(record: ConsumerRecord<String, String>) {
+        val span = tracer.spanBuilder("processFraudCheckResult")
+            .startSpan()
+        try {
+            span.makeCurrent().use { ctx ->
+                val transactionId = record.key()
+                span.setAttribute(AttributeKey.stringKey("record.transactionId"), transactionId)
+                log.info("Received fraud check result for transaction: {}", transactionId)
+
+                val updatedTransaction = transactionRepository.updateStatus(
+                    transactionId,
+                    TransactionStatus.PENDING_BALANCE_DEDUCTION
+                )
+
+
+                if (updatedTransaction != null) {
+                    // Update user's balance based on transaction type
+                    when (updatedTransaction.type) {
+                        TransactionType.TOP_UP -> {
+                            span.addEvent(
+                                "topUpTransactionApproved",
+                                updatedTransaction.toEventAttributes()
+                            )
+
+                            val response = userServiceClient(
+                                Request(Method.POST, "http://user-service:8080/user/balance/update")
+                                    .with(
+                                        Body.auto<UpdateBalanceRequest>().toLens() of UpdateBalanceRequest(
+                                            userId = updatedTransaction.userId,
+                                            newBalance = getCurrentBalance(updatedTransaction.userId)?.plus(
+                                                updatedTransaction.amount
+                                            ) ?: updatedTransaction.amount
+                                        )
+                                    )
+                            )
+
+                            handleBalanceUpdateResponse(response, transactionId)
+                        }
+
+                        TransactionType.PURCHASE -> {
+                            val response = userServiceClient(
+                                Request(Method.POST, "http://user-service:8080/user/balance/update")
+                                    .with(
+                                        Body.auto<UpdateBalanceRequest>().toLens() of UpdateBalanceRequest(
+                                            userId = updatedTransaction.userId,
+                                            newBalance = getCurrentBalance(updatedTransaction.userId)?.minus(
+                                                updatedTransaction.amount
+                                            ) ?: -updatedTransaction.amount
+                                        )
+                                    )
+                            )
+
+                            handleBalanceUpdateResponse(response, transactionId)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            log.error("Error processing fraud result: {}", e.message, e)
+            span.recordException(e)
+        } finally {
+            span.end()
         }
     }
 
@@ -208,6 +238,11 @@ class TransactionService(
 
                     // Record balance update latency
                     balanceUpdateLatency.record((System.currentTimeMillis() - startTime).toDouble())
+
+                    Span.current().addEvent(
+                        "transactionAppliedToUserBalance",
+                        transaction.toEventAttributes()
+                    )
                 }
             }
             Status.BAD_REQUEST -> {
@@ -232,6 +267,14 @@ class TransactionService(
                     AttributeKey.stringKey("status"), reason
                 )
             )
+
+            Span.current()
+                .setStatus(StatusCode.ERROR)
+                .setAttribute("failure.reason", reason)
+                .addEvent(
+                    "transactionFailedToApplyToUserBalance",
+                    transaction.toEventAttributes()
+                )
         }
     }
 
@@ -254,6 +297,11 @@ class TransactionService(
             amount = amount,
             description = "TOP-UP: Account balance top-up",
             type = TransactionType.TOP_UP
+        )
+        val span = Span.current()
+        span.addEvent(
+            "topUpTransactionCreated",
+            transaction.toEventAttributes()
         )
         
         // Record user transaction frequency for top-ups
@@ -305,6 +353,13 @@ class TransactionService(
             description = description,
             type = TransactionType.PURCHASE
         )
+        val span = Span.current()
+        span.addEvent(
+            "purchaseTransactionCreated",
+            transaction.toEventAttributes().toBuilder().put(
+                "transaction.amountCurrency", amount.toString()
+            ).build(),
+        )
         
         // Record user transaction frequency for purchases
         recordTransactionFrequency(userId, TransactionType.PURCHASE)
@@ -333,6 +388,12 @@ class TransactionService(
             .setAttribute(SemanticAttributes.MESSAGING_DESTINATION_NAME, FRAUD_CHECK_TOPIC)
             .setAttribute(SemanticAttributes.MESSAGING_OPERATION, "publish")
             .setAttribute("messaging.kafka.client_id", "transaction-service")
+            .setAttribute("transaction.id", transaction.id)
+            .setAttribute("transaction.userId", transaction.userId)
+            .setAttribute("transaction.description", transaction.description)
+            .setAttribute("transaction.amount", transaction.amount.toString())
+            .setAttribute("transaction.createdAt", transaction.createdAt.toString())
+            .setAttribute("transaction.status", transaction.status.name)
             .startSpan()
 
         try {
@@ -360,7 +421,7 @@ class TransactionService(
         } catch (e: Exception) {
             log.error("Error publishing fraud check request: {}", e.message)
             span.recordException(e)
-            span.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, "Error publishing fraud check request")
+            span.setStatus(StatusCode.ERROR, "Error publishing fraud check request")
         } finally {
             span.end()
         }
@@ -370,6 +431,15 @@ class TransactionService(
         log.info("Fetching transactions for user_id: {}", userId)
         return transactionRepository.findByUserId(userId)
     }
+
+    private fun Transaction.toEventAttributes() = Attributes.of(
+        AttributeKey.stringKey("transaction.id"), this.id,
+        AttributeKey.stringKey("transaction.userId"), this.userId,
+        AttributeKey.stringKey("transaction.description"), this.description,
+        AttributeKey.stringKey("transaction.amount"), this.amount.toString(),
+        AttributeKey.stringKey("transaction.createdAt"), this.createdAt.toString(),
+        AttributeKey.stringKey("transaction.status"), this.status.name
+    )
 }
 
 data class ApiResponse<T>(

@@ -2,6 +2,8 @@ package com.example.api
 
 import com.example.domain.*
 import com.example.usecase.*
+import io.opentelemetry.api.trace.Span
+import io.opentelemetry.api.trace.StatusCode
 import org.http4k.core.*
 import org.http4k.core.Method.GET
 import org.http4k.core.Status.Companion.OK
@@ -39,13 +41,20 @@ class CurrencyExchangeApi(
 
         "/convert" bind GET to { req ->
             log.info("Received /convert request with headers: {}", req.headers)
-            
-            try {
-                val amount = req.query("amount")?.toBigDecimalOrNull()
-                val fromCurrency = req.query("from")
-                val toCurrency = req.query("to")
 
+            val amount = req.query("amount")?.toBigDecimalOrNull()
+            val fromCurrency = req.query("from")
+            val toCurrency = req.query("to")
+
+            val span = Span.current()
+            span.setAttribute("req.amount", amount.toString())
+            span.setAttribute("req.fromCurrency", fromCurrency ?: "null")
+            span.setAttribute("req.toCurrency", toCurrency ?: "null")
+
+            try {
                 if (amount == null || fromCurrency == null || toCurrency == null) {
+                    span.setStatus(StatusCode.ERROR)
+                    span.addEvent("requestRequiredParametersMissed")
                     Response(BAD_REQUEST).with(apiResponseLens<Unit>() of ApiResponse(
                         status = "error",
                         message = "Missing required parameters"
@@ -72,6 +81,8 @@ class CurrencyExchangeApi(
                 }
             } catch (e: IllegalArgumentException) {
                 log.error("Error processing conversion request", e)
+                span.setStatus(StatusCode.ERROR)
+                span.recordException(e)
                 Response(BAD_REQUEST).with(apiResponseLens<Unit>() of ApiResponse(
                     status = "error",
                     message = e.message

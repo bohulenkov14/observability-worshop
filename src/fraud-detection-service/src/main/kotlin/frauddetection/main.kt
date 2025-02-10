@@ -21,6 +21,7 @@ import io.opentelemetry.api.GlobalOpenTelemetry
 import io.opentelemetry.api.metrics.DoubleHistogram
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.common.AttributeKey
+import io.opentelemetry.api.trace.StatusCode
 
 const val FRAUD_CHECK_TOPIC = "transactions.fraud.check"
 const val FRAUD_RESULT_TOPIC = "transactions.fraud.result"
@@ -28,6 +29,7 @@ const val GROUP_ID = "fraud-detection"
 
 private val logger = LoggerFactory.getLogger(GROUP_ID)
 private val meter = GlobalOpenTelemetry.getMeter("fraud-detection")
+private val tracer = GlobalOpenTelemetry.getTracer("fraud-detection")
 
 // Business metrics
 private val fraudCheckDuration: DoubleHistogram = meter.histogramBuilder("fraud_check_duration_ms")
@@ -86,32 +88,9 @@ fun main() {
                     
                     logger.info("Processing transaction for fraud check - ID: {}", transactionId)
                     logger.info("Transaction details: {}", transactionJson)
-                    
-                    // Mimic some CPU-intensive fraud detection work
-                    val isFraudulent = performDummyFraudCheck()
-                    
-                    // Record the fraud check duration
-                    val duration = System.currentTimeMillis() - startTime
-                    fraudCheckDuration.record(duration.toDouble())
-                    
-                    // Record fraud detection metrics
-                    if (isFraudulent) {
-                        fraudDetectionRate.add(1, Attributes.of(
-                            AttributeKey.stringKey("transaction_id"), transactionId,
-                            AttributeKey.stringKey("result"), "fraudulent"
-                        ))
-                        
-                        // For demo purposes, we'll simulate accuracy based on amount
-                        // In a real system, this would come from feedback/verification
-                        fraudCheckAccuracy.record(0.95) // 95% confidence for fraudulent cases
-                    } else {
-                        fraudDetectionRate.add(1, Attributes.of(
-                            AttributeKey.stringKey("transaction_id"), transactionId,
-                            AttributeKey.stringKey("result"), "legitimate"
-                        ))
-                        fraudCheckAccuracy.record(0.90) // 90% confidence for legitimate cases
-                    }
-                    
+
+                    executeFraudCheck(startTime, transactionId)
+
                     // Publish the result
                     val result = ProducerRecord(
                         FRAUD_RESULT_TOPIC,
@@ -133,6 +112,50 @@ fun main() {
                     }
                 }
         }
+    }
+}
+
+private fun executeFraudCheck(startTime: Long, transactionId: String?) {
+    val span = tracer.spanBuilder("executeFraudCheck")
+        .setAttribute("record.transactionId", transactionId)
+        .startSpan()
+    try {
+        span.makeCurrent().use { ctx ->
+            // Mimic some CPU-intensive fraud detection work
+            val isFraudulent = performDummyFraudCheck()
+
+            // Record the fraud check duration
+            val duration = System.currentTimeMillis() - startTime
+            fraudCheckDuration.record(duration.toDouble())
+
+            // Record fraud detection metrics
+            if (isFraudulent) {
+                fraudDetectionRate.add(
+                    1, Attributes.of(
+                        AttributeKey.stringKey("transaction_id"), transactionId,
+                        AttributeKey.stringKey("result"), "fraudulent"
+                    )
+                )
+
+                // For demo purposes, we'll simulate accuracy based on amount
+                // In a real system, this would come from feedback/verification
+                fraudCheckAccuracy.record(0.95) // 95% confidence for fraudulent cases
+            } else {
+                fraudDetectionRate.add(
+                    1, Attributes.of(
+                        AttributeKey.stringKey("transaction_id"), transactionId,
+                        AttributeKey.stringKey("result"), "legitimate"
+                    )
+                )
+                fraudCheckAccuracy.record(0.90) // 90% confidence for legitimate cases
+            }
+        }
+    }  catch (e: Exception) {
+        logger.error("Error while processing transaction record with id ${transactionId}", e)
+        span.setStatus(StatusCode.ERROR)
+        span.recordException(e)
+    } finally {
+        span.end()
     }
 }
 

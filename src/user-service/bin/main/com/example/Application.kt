@@ -4,6 +4,7 @@ import com.example.config.AppConfig
 import com.example.repository.UserRepository
 import com.example.service.UserService
 import com.sksamuel.hoplite.ConfigLoader
+import io.opentelemetry.api.trace.Span
 import org.http4k.core.*
 import org.http4k.core.Method.GET
 import org.http4k.core.Method.POST
@@ -76,6 +77,10 @@ fun main() {
 
         "/user/create" bind POST to { req ->
             val createUserReq = createUserLens(req)
+            val span = Span.current()
+            span.setAttribute("req.email", createUserReq.email)
+            span.setAttribute("req.username", createUserReq.username)
+
             val user = userService.createUser(createUserReq.username, createUserReq.email)
             
             val response = ApiResponse(
@@ -92,6 +97,10 @@ fun main() {
 
         "/user/balance/update" bind POST to { req ->
             val updateReq = updateBalanceLens(req)
+            val span = Span.current()
+            span.setAttribute("req.userId", updateReq.userId)
+            span.setAttribute("req.newBalance", updateReq.newBalance.toDouble())
+
             val user = userService.updateBalance(updateReq.userId, updateReq.newBalance)
             
             if (user == null) {
@@ -109,6 +118,9 @@ fun main() {
 
         "/user/freeze" bind POST to { req ->
             val freezeReq = freezeAccountLens(req)
+            val span = Span.current()
+            span.setAttribute("req.userId", freezeReq.userId)
+
             val user = userService.freezeAccount(freezeReq.userId)
             
             if (user == null) {
@@ -126,6 +138,9 @@ fun main() {
 
         "/user/unfreeze" bind POST to { req ->
             val freezeReq = freezeAccountLens(req)
+            val span = Span.current()
+            span.setAttribute("req.userId", freezeReq.userId)
+
             val user = userService.unfreezeAccount(freezeReq.userId)
             
             if (user == null) {
@@ -148,6 +163,8 @@ fun main() {
                     message = "Missing user ID"
                 )
             )
+            val span = Span.current()
+            span.setAttribute("req.userId", userId)
             
             val user = userService.findUser(userId)
             if (user == null) {
