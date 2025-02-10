@@ -16,6 +16,9 @@ dependencies {
     implementation("io.opentelemetry:opentelemetry-api:1.46.0")
     implementation("io.opentelemetry:opentelemetry-sdk:1.46.0")
     implementation("io.opentelemetry:opentelemetry-extension-annotations:1.18.0")
+    implementation("com.fasterxml.jackson.core:jackson-core:2.18.2")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.2")
 }
 
 application {

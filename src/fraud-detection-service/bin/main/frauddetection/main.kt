@@ -22,6 +22,8 @@ import io.opentelemetry.api.metrics.DoubleHistogram
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.trace.StatusCode
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 
 const val FRAUD_CHECK_TOPIC = "transactions.fraud.check"
 const val FRAUD_RESULT_TOPIC = "transactions.fraud.result"
@@ -30,6 +32,9 @@ const val GROUP_ID = "fraud-detection"
 private val logger = LoggerFactory.getLogger(GROUP_ID)
 private val meter = GlobalOpenTelemetry.getMeter("fraud-detection")
 private val tracer = GlobalOpenTelemetry.getTracer("fraud-detection")
+private val objectMapper = ObjectMapper().apply {
+    registerModule(JavaTimeModule())
+}
 
 // Business metrics
 private val fraudCheckDuration: DoubleHistogram = meter.histogramBuilder("fraud_check_duration_ms")
@@ -89,7 +94,7 @@ fun main() {
                     logger.info("Processing transaction for fraud check - ID: {}", transactionId)
                     logger.info("Transaction details: {}", transactionJson)
 
-                    executeFraudCheck(startTime, transactionId)
+                    executeFraudCheck(startTime, transactionId,  transactionJson)
 
                     // Publish the result
                     val result = ProducerRecord(
@@ -115,12 +120,19 @@ fun main() {
     }
 }
 
-private fun executeFraudCheck(startTime: Long, transactionId: String?) {
+private fun executeFraudCheck(startTime: Long, transactionId: String?, transactionJson: String) {
     val span = tracer.spanBuilder("executeFraudCheck")
         .setAttribute("record.transactionId", transactionId)
         .startSpan()
     try {
         span.makeCurrent().use { ctx ->
+            // Parse transaction to get userId
+            val transaction = objectMapper.readTree(transactionJson)
+            val userId = transaction.get("userId").asText()
+            span.setAttribute("transaction.userId", userId)
+
+            orderCreditReport(userId,10)
+
             // Mimic some CPU-intensive fraud detection work
             val isFraudulent = performDummyFraudCheck()
 
@@ -156,6 +168,36 @@ private fun executeFraudCheck(startTime: Long, transactionId: String?) {
         span.recordException(e)
     } finally {
         span.end()
+    }
+}
+
+private fun orderCreditReport(userId: String, depth: Int) {
+    if (depth <= 0) return
+
+    val childSpan = tracer.spanBuilder("orderCreditReport")
+        .setAttribute("company.name", "Tom Bombadil Incorporated")
+        .startSpan()
+
+    try {
+        childSpan.makeCurrent().use { ctx ->
+            // Add an event for this branch
+            childSpan.addEvent("branchCompanyReportRequested", 
+                Attributes.of(
+                    AttributeKey.stringKey("companyName"), "Tom Bombadil Incorporated",
+                    AttributeKey.stringKey("reportType"), "credit_history"
+                )
+            )
+
+            // Simulate problematic vendor API call
+            Thread.sleep(Random.nextLong(6000, 10000))
+
+            // Recursive call simulating error in report ordering
+            if (userId == "fixed_user_3") {
+                orderCreditReport(userId, depth - 1)
+            }
+        }
+    } finally {
+        childSpan.end()
     }
 }
 
