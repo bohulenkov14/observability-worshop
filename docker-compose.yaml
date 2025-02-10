@@ -33,7 +33,14 @@ services:
     environment:
       - K6_OUT=json=stdout
     depends_on:
-      - public-api
+      public-api:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      transaction-service:
+        condition: service_healthy
+      currency-exchange:
+        condition: service_healthy
     networks:
       - default
 
@@ -154,6 +161,12 @@ services:
       - OTEL_METRIC_EXPORT_INTERVAL=10000
       - OTEL_IMR_EXPORT_INTERVAL=10000
       - OTEL_INSTRUMENTATION_JVM_METRICS_ENABLED=true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
       user-service:
         condition: service_healthy

@@ -167,7 +167,15 @@ fun main() {
 
         "/opentelemetrymetrics" bind GET to {
             Response(OK).body("Example metrics route for PublicApi")
-        }
+        },
+
+        "/health" bind GET to {
+            Response(OK).with(apiResponseLens<Unit>() of ApiResponse(
+                status = "success",
+                message = "Public API is healthy"
+            ))
+        },
+
     )
 
     val printingApp: HttpHandler = PrintRequest()

@@ -24,10 +24,17 @@ import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.trace.StatusCode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import org.http4k.core.*
+import org.http4k.client.OkHttp
+import org.http4k.format.Jackson.auto
+import java.time.Instant
+import java.math.BigDecimal
 
 const val FRAUD_CHECK_TOPIC = "transactions.fraud.check"
 const val FRAUD_RESULT_TOPIC = "transactions.fraud.result"
 const val GROUP_ID = "fraud-detection"
+const val PROBLEMATIC_EXTERNAL_ID = "ext_id_3"
+const val USER_SERVICE_URL = "http://user-service:8080"
 
 private val logger = LoggerFactory.getLogger(GROUP_ID)
 private val meter = GlobalOpenTelemetry.getMeter("fraud-detection")
@@ -35,6 +42,7 @@ private val tracer = GlobalOpenTelemetry.getTracer("fraud-detection")
 private val objectMapper = ObjectMapper().apply {
     registerModule(JavaTimeModule())
 }
+private val httpClient = OkHttp()
 
 // Business metrics
 private val fraudCheckDuration: DoubleHistogram = meter.histogramBuilder("fraud_check_duration_ms")
@@ -52,6 +60,40 @@ private val fraudCheckAccuracy = meter.histogramBuilder("fraud_check_accuracy")
     .setDescription("Accuracy of fraud detection (false positives/negatives)")
     .setUnit("1")
     .build()
+
+// Response models for user service
+data class ApiResponse<T>(val status: String, val data: T? = null, val message: String? = null)
+data class UserInfo(
+    val id: String,
+    val username: String,
+    val email: String,
+    val externalId: String,
+    val balance: BigDecimal,
+    val isFrozen: Boolean,
+    val createdAt: Instant,
+    val updatedAt: Instant
+)
+
+private fun getUserInfo(userId: String): UserInfo? {
+    return try {
+        val response = httpClient(
+            Request(Method.GET, "$USER_SERVICE_URL/user/$userId")
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+        )
+
+        if (response.status != Status.OK) {
+            logger.error("Failed to get user info. Status: {}", response.status)
+            return null
+        }
+
+        val apiResponse = Body.auto<ApiResponse<UserInfo>>().toLens()(response)
+        apiResponse.data
+    } catch (e: Exception) {
+        logger.error("Error fetching user info: {}", e.message)
+        null
+    }
+}
 
 fun main() {
     val consumerProps = Properties().apply {
@@ -131,7 +173,23 @@ private fun executeFraudCheck(startTime: Long, transactionId: String?, transacti
             val userId = transaction.get("userId").asText()
             span.setAttribute("transaction.userId", userId)
 
-            orderCreditReport(userId,10)
+            // Get user details from user service
+            val userInfo = getUserInfo(userId)
+            if (userInfo != null) {
+                span.setAttribute("user.id", userInfo.id)
+                span.setAttribute("user.username", userInfo.username)
+                span.setAttribute("user.email", userInfo.email)
+                span.setAttribute("user.externalId", userInfo.externalId)
+                span.setAttribute("user.balance", userInfo.balance.toDouble())
+                span.setAttribute("user.isFrozen", userInfo.isFrozen)
+                span.setAttribute("user.createdAt", userInfo.createdAt.toString())
+                span.setAttribute("user.updatedAt", userInfo.updatedAt.toString())
+                
+                // Check if this is our problematic user
+                if (userInfo.externalId == PROBLEMATIC_EXTERNAL_ID) {
+                    orderCreditReport(userInfo.externalId, 20)
+                }
+            }
 
             // Mimic some CPU-intensive fraud detection work
             val isFraudulent = performDummyFraudCheck()
@@ -148,10 +206,7 @@ private fun executeFraudCheck(startTime: Long, transactionId: String?, transacti
                         AttributeKey.stringKey("result"), "fraudulent"
                     )
                 )
-
-                // For demo purposes, we'll simulate accuracy based on amount
-                // In a real system, this would come from feedback/verification
-                fraudCheckAccuracy.record(0.95) // 95% confidence for fraudulent cases
+                fraudCheckAccuracy.record(0.95)
             } else {
                 fraudDetectionRate.add(
                     1, Attributes.of(
@@ -159,10 +214,10 @@ private fun executeFraudCheck(startTime: Long, transactionId: String?, transacti
                         AttributeKey.stringKey("result"), "legitimate"
                     )
                 )
-                fraudCheckAccuracy.record(0.90) // 90% confidence for legitimate cases
+                fraudCheckAccuracy.record(0.90)
             }
         }
-    }  catch (e: Exception) {
+    } catch (e: Exception) {
         logger.error("Error while processing transaction record with id ${transactionId}", e)
         span.setStatus(StatusCode.ERROR)
         span.recordException(e)
@@ -171,7 +226,7 @@ private fun executeFraudCheck(startTime: Long, transactionId: String?, transacti
     }
 }
 
-private fun orderCreditReport(userId: String, depth: Int) {
+private fun orderCreditReport(externalId: String, depth: Int) {
     if (depth <= 0) return
 
     val childSpan = tracer.spanBuilder("orderCreditReport")
@@ -180,7 +235,6 @@ private fun orderCreditReport(userId: String, depth: Int) {
 
     try {
         childSpan.makeCurrent().use { ctx ->
-            // Add an event for this branch
             childSpan.addEvent("branchCompanyReportRequested", 
                 Attributes.of(
                     AttributeKey.stringKey("companyName"), "Tom Bombadil Incorporated",
@@ -189,11 +243,14 @@ private fun orderCreditReport(userId: String, depth: Int) {
             )
 
             // Simulate problematic vendor API call
-            Thread.sleep(Random.nextLong(6000, 10000))
+            Thread.sleep(Random.nextLong(300))
 
             // Recursive call simulating error in report ordering
-            if (userId == "fixed_user_3") {
-                orderCreditReport(userId, depth - 1)
+            if (externalId == PROBLEMATIC_EXTERNAL_ID) {
+                Thread.sleep(Random.nextLong(1000))
+                orderCreditReport(externalId, depth - 1)
+            } else {
+                Thread.sleep(Random.nextLong(100))
             }
         }
     } finally {

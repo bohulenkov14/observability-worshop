@@ -1,6 +1,9 @@
 # Observability Workshop
 Goal - try out observability tools with a simple distributed system inplemented in kotlin
 
+## Problem 1
+You receive alert about transaction processing taking longer than expected. Critical level alert.
+
 ## Technology Used
 - Kotlin
 - Http4k

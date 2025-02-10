@@ -10,6 +10,7 @@ repositories {
 }
 
 dependencies {
+    implementation(platform("org.http4k:http4k-bom:5.45.0.0"))
     implementation("org.apache.kafka:kafka-clients:3.6.0")
     implementation("org.slf4j:slf4j-api:2.0.16")
     implementation("ch.qos.logback:logback-classic:1.4.14")
@@ -19,6 +20,9 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-core:2.18.2")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.2")
+    implementation("org.http4k:http4k-core")
+    implementation("org.http4k:http4k-client-okhttp")
+    implementation("org.http4k:http4k-format-jackson")
 }
 
 application {
