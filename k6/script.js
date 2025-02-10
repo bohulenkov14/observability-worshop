@@ -15,7 +15,8 @@ const users = new SharedArray('users', function() {
     for (let i = 0; i < 10; i++) {
         users.push({
             username: `fixed_user_${i}`,
-            email: `fixed_user_${i}@example.com`
+            email: `fixed_user_${i}@example.com`,
+            externalId: `ext_id_${i}`
         });
     }
     return users;

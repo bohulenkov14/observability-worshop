@@ -4,6 +4,8 @@ import com.example.config.AppConfig
 import com.example.repository.UserRepository
 import com.example.service.UserService
 import com.sksamuel.hoplite.ConfigLoader
+import io.opentelemetry.api.common.AttributeKey
+import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.trace.Span
 import org.http4k.core.*
 import org.http4k.core.Method.GET
@@ -30,19 +32,34 @@ import java.math.BigDecimal
 import java.time.Instant
 
 // Data classes for request payloads
-data class CreateUserRequest(val username: String, val email: String)
+data class CreateUserRequest(
+    val username: String, 
+    val email: String,
+    val externalId: String
+)
 data class UpdateBalanceRequest(val userId: String, val newBalance: BigDecimal)
 data class FreezeAccountRequest(val userId: String)
 data class ApiResponse<T>(val status: String, val data: T? = null, val message: String? = null, val errorCode: String? = null)
 data class CreateUserResponse(
     val id: String,
     val username: String,
-    val email: String
+    val email: String,
+    val externalId: String
 )
 data class UserBalance(
     val userId: String, 
     val balance: BigDecimal,
     val lastUpdatedAt: Instant
+)
+data class UserInfoResponse(
+    val id: String,
+    val username: String,
+    val email: String,
+    val externalId: String,
+    val balance: BigDecimal,
+    val isFrozen: Boolean,
+    val createdAt: Instant,
+    val updatedAt: Instant
 )
 
 private val log = LoggerFactory.getLogger("UserService")
@@ -80,17 +97,32 @@ fun main() {
             val span = Span.current()
             span.setAttribute("req.email", createUserReq.email)
             span.setAttribute("req.username", createUserReq.username)
+            span.setAttribute("req.externalId", createUserReq.externalId)
 
-            val user = userService.createUser(createUserReq.username, createUserReq.email)
+            val user = userService.createUser(
+                createUserReq.username, 
+                createUserReq.email,
+                createUserReq.externalId
+            )
             
             val response = ApiResponse(
                 status = "success",
                 data = CreateUserResponse(
                     id = user.id,
                     username = user.username,
-                    email = user.email
+                    email = user.email,
+                    externalId = user.externalId
                 ),
                 message = "User created successfully"
+            )
+            span.addEvent(
+                "userCreated",
+                Attributes.of(
+                    AttributeKey.stringKey("id"), user.id,
+                    AttributeKey.stringKey("username"), user.username,
+                    AttributeKey.stringKey("email"), user.email,
+                    AttributeKey.stringKey("externalId"), user.externalId,
+                )
             )
             Response(CREATED).with(apiResponseLens<CreateUserResponse>() of response)
         },
@@ -181,6 +213,42 @@ fun main() {
                         lastUpdatedAt = user.updatedAt
                     ),
                     message = "Balance retrieved successfully"
+                ))
+            }
+        },
+
+        "/user/{userId}" bind GET to { req ->
+            val userId = req.path("userId") ?: return@to Response(BAD_REQUEST).with(
+                apiResponseLens<Unit>() of ApiResponse(
+                    status = "error",
+                    message = "Missing user ID"
+                )
+            )
+            
+            val span = Span.current()
+            span.setAttribute("req.userId", userId)
+
+            val user = userService.findUser(userId)
+            
+            if (user == null) {
+                Response(NOT_FOUND).with(apiResponseLens<Unit>() of ApiResponse(
+                    status = "error",
+                    message = "User not found"
+                ))
+            } else {
+                Response(OK).with(apiResponseLens<UserInfoResponse>() of ApiResponse(
+                    status = "success",
+                    data = UserInfoResponse(
+                        id = user.id,
+                        username = user.username,
+                        email = user.email,
+                        externalId = user.externalId,
+                        balance = user.balance,
+                        isFrozen = user.isFrozen,
+                        createdAt = user.createdAt,
+                        updatedAt = user.updatedAt
+                    ),
+                    message = "User found"
                 ))
             }
         }
