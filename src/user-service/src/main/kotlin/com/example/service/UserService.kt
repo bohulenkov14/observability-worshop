@@ -22,9 +22,9 @@ class UserService(private val userRepository: UserRepository) {
         )
         .build()
 
-    fun createUser(username: String, email: String): User {
-        log.info("Creating user - username: {}, email: {}", username, email)
-        return userRepository.create(username, email)
+    fun createUser(username: String, email: String, externalId: String): User {
+        log.info("Creating user - username: {}, email: {}, externalId: {}", username, email, externalId)
+        return userRepository.create(username, email, externalId)
     }
 
     fun updateBalance(userId: String, newBalance: BigDecimal): User? {

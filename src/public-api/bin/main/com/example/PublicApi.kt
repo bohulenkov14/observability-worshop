@@ -25,7 +25,7 @@ import org.http4k.format.Jackson.auto
 import org.slf4j.LoggerFactory
 
 // Data classes for request payloads
-data class CreateUserRequest(val username: String, val email: String)
+data class CreateUserRequest(val username: String, val email: String, val externalId: String)
 data class TopUpRequest(val amount: Double, val currency: String = "USD")
 data class PurchaseRequest(
     val amount: Double,
@@ -84,6 +84,7 @@ fun main() {
             val span = Span.current()
             span.setAttribute("req.username", userCreateRequest.username)
             span.setAttribute("req.email", userCreateRequest.email)
+            span.setAttribute("req.externalId", userCreateRequest.externalId)
             proxyRequest(req, USER_SERVICE_URL, "/user/create")
         },
 

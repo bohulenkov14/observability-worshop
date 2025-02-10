@@ -15,6 +15,7 @@ object Users : UUIDTable("users") {
     val email = varchar("email", 255).uniqueIndex()
     val balance = decimal("balance", 19, 4)
     val isFrozen = bool("is_frozen").default(false)
+    val externalId = varchar("external_id", 255)
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
 }
@@ -26,7 +27,7 @@ class UserRepository {
         }
     }
 
-    fun create(username: String, email: String): User = transaction {
+    fun create(username: String, email: String, externalId: String): User = transaction {
         val id = UUID.randomUUID()
         val now = Instant.now()
         
@@ -36,6 +37,7 @@ class UserRepository {
             it[Users.email] = email
             it[balance] = BigDecimal.ZERO
             it[isFrozen] = false
+            it[Users.externalId] = externalId
             it[createdAt] = now
             it[updatedAt] = now
         }
@@ -46,6 +48,7 @@ class UserRepository {
             email = email,
             balance = BigDecimal.ZERO,
             isFrozen = false,
+            externalId = externalId,
             createdAt = now,
             updatedAt = now
         )
@@ -86,6 +89,7 @@ class UserRepository {
         email = this[Users.email],
         balance = this[Users.balance],
         isFrozen = this[Users.isFrozen],
+        externalId = this[Users.externalId],
         createdAt = this[Users.createdAt],
         updatedAt = this[Users.updatedAt]
     )

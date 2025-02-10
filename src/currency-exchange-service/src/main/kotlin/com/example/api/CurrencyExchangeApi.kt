@@ -53,8 +53,6 @@ class CurrencyExchangeApi(
 
             try {
                 if (amount == null || fromCurrency == null || toCurrency == null) {
-                    span.setStatus(StatusCode.ERROR)
-                    span.addEvent("requestRequiredParametersMissed")
                     Response(BAD_REQUEST).with(apiResponseLens<Unit>() of ApiResponse(
                         status = "error",
                         message = "Missing required parameters"

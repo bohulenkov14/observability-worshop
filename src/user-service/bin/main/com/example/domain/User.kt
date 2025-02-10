@@ -9,6 +9,7 @@ data class User(
     val email: String,
     val balance: BigDecimal,
     val isFrozen: Boolean = false,
+    val externalId: String,
     val createdAt: Instant,
     val updatedAt: Instant
 ) 
