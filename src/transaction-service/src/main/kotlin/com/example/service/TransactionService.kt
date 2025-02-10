@@ -24,6 +24,9 @@ import io.opentelemetry.api.trace.SpanKind
 import io.opentelemetry.context.Context
 import io.opentelemetry.context.propagation.TextMapSetter
 import io.opentelemetry.semconv.SemanticAttributes
+import io.opentelemetry.api.metrics.DoubleHistogram
+import io.opentelemetry.api.common.AttributeKey
+import io.opentelemetry.api.common.Attributes
 import java.util.Properties
 import org.http4k.format.Jackson.auto
 import java.time.Duration
@@ -41,6 +44,44 @@ class TransactionService(
     }
     private val tracer = GlobalOpenTelemetry.getTracer("transaction-service")
     private val propagator = GlobalOpenTelemetry.getPropagators().textMapPropagator
+    private val meter = GlobalOpenTelemetry.getMeter("transaction-service")
+    
+    // Business metrics
+    private val transactionProcessingTime: DoubleHistogram = meter.histogramBuilder("transaction_processing_duration_ms")
+        .setDescription("Time taken to process a transaction from creation to completion")
+        .setUnit("milliseconds")
+        .build()
+
+    // Transaction Volume Metrics
+    private val transactionVolume = meter.counterBuilder("transaction_volume_total")
+        .setDescription("Total number of transactions")
+        .setUnit("1")
+        .build()
+
+    // Currency Exchange Metrics
+    private val currencyConversionVolume = meter.counterBuilder("currency_conversion_total")
+        .setDescription("Number of currency conversions performed")
+        .setUnit("1")
+        .build()
+
+    // User Activity Metrics
+    private val userTransactionFrequency = meter.histogramBuilder("user_transaction_frequency")
+        .setDescription("Time between user transactions")
+        .setUnit("seconds")
+        .build()
+
+    // Balance-related Metrics
+    private val balanceUpdateLatency = meter.histogramBuilder("balance_update_duration_ms")
+        .setDescription("Time taken to update user balance")
+        .setUnit("milliseconds")
+        .build()
+
+    // Transaction Amount Metrics
+    private val transactionAmount = meter.histogramBuilder("transaction_amount")
+        .setDescription("Distribution of transaction amounts in original currency")
+        .setUnit("1")
+        .build()
+
     private val conversionResponseLens = Body.auto<ApiResponse<CurrencyConversionResponse>>().toLens()
     private val apiResponseLens = Body.auto<ApiResponse<Unit>>().toLens()
     private val userServiceClient = OkHttp()
@@ -82,20 +123,20 @@ class TransactionService(
                             val transactionId = record.key()
                             log.info("Received fraud check result for transaction: {}", transactionId)
                             
-                            val transaction = transactionRepository.updateStatus(
+                            val updatedTransaction = transactionRepository.updateStatus(
                                 transactionId,
                                 TransactionStatus.PENDING_BALANCE_DEDUCTION
                             )
 
-                            if (transaction != null) {
+                            if (updatedTransaction != null) {
                                 // Update user's balance based on transaction type
-                                when (transaction.type) {
+                                when (updatedTransaction.type) {
                                     TransactionType.TOP_UP -> {
                                         val response = userServiceClient(
                                             Request(Method.POST, "http://user-service:8080/user/balance/update")
                                                 .with(Body.auto<UpdateBalanceRequest>().toLens() of UpdateBalanceRequest(
-                                                    userId = transaction.userId,
-                                                    newBalance = getCurrentBalance(transaction.userId)?.plus(transaction.amount) ?: transaction.amount
+                                                    userId = updatedTransaction.userId,
+                                                    newBalance = getCurrentBalance(updatedTransaction.userId)?.plus(updatedTransaction.amount) ?: updatedTransaction.amount
                                                 ))
                                         )
 
@@ -105,8 +146,8 @@ class TransactionService(
                                         val response = userServiceClient(
                                             Request(Method.POST, "http://user-service:8080/user/balance/update")
                                                 .with(Body.auto<UpdateBalanceRequest>().toLens() of UpdateBalanceRequest(
-                                                    userId = transaction.userId,
-                                                    newBalance = getCurrentBalance(transaction.userId)?.minus(transaction.amount) ?: -transaction.amount
+                                                    userId = updatedTransaction.userId,
+                                                    newBalance = getCurrentBalance(updatedTransaction.userId)?.minus(updatedTransaction.amount) ?: -updatedTransaction.amount
                                                 ))
                                         )
 
@@ -139,20 +180,58 @@ class TransactionService(
     }
 
     private fun handleBalanceUpdateResponse(response: Response, transactionId: String) {
+        val startTime = System.currentTimeMillis()
         when (response.status) {
             Status.OK -> {
                 transactionRepository.updateStatus(transactionId, TransactionStatus.PROCESSED)
                 log.info("Successfully processed transaction: {}", transactionId)
+                
+                // Record metrics
+                val transaction = transactionRepository.findById(transactionId)
+                if (transaction != null) {
+                    val processingDurationMs = System.currentTimeMillis() - transaction.createdAt.toEpochMilli()
+                    
+                    // Record processing time
+                    transactionProcessingTime.record(
+                        processingDurationMs.toDouble(),
+                        Attributes.of(
+                            AttributeKey.stringKey("transaction_type"), transaction.type.name,
+                            AttributeKey.stringKey("status"), "success"
+                        )
+                    )
+
+                    // Record transaction volume
+                    transactionVolume.add(1, Attributes.of(
+                        AttributeKey.stringKey("transaction_type"), transaction.type.name,
+                        AttributeKey.stringKey("status"), "success"
+                    ))
+
+                    // Record balance update latency
+                    balanceUpdateLatency.record((System.currentTimeMillis() - startTime).toDouble())
+                }
             }
             Status.BAD_REQUEST -> {
                 val apiResponse = apiResponseLens(response)
-                if (apiResponse.errorCode == "ACCOUNT_FROZEN") {
-                    log.info("Account frozen, cannot process transaction: {}", transactionId)
-                }
+                recordFailedTransaction(transactionId, "bad_request")
             }
             else -> {
                 log.error("Failed to update balance for transaction {}: {}", transactionId, response.status)
+                recordFailedTransaction(transactionId, "error")
             }
+        }
+    }
+
+    private fun recordFailedTransaction(transactionId: String, reason: String) {
+        val transaction = transactionRepository.findById(transactionId)
+        if (transaction != null) {
+            val processingDurationMs = System.currentTimeMillis() - transaction.createdAt.toEpochMilli()
+            transactionProcessingTime.record(
+                processingDurationMs.toDouble(),
+                Attributes.of(
+                    AttributeKey.stringKey("transaction_type"), transaction.type.name,
+                    AttributeKey.stringKey("status"), reason
+                )
+            )
         }
     }
 
@@ -164,6 +243,12 @@ class TransactionService(
     fun createTopUp(userId: String, amount: BigDecimal): Transaction {
         log.info("Creating top-up - user_id: {}, amount: {}", userId, amount)
         
+        // Record transaction amount
+        transactionAmount.record(amount.toDouble(), Attributes.of(
+            AttributeKey.stringKey("transaction_type"), TransactionType.TOP_UP.name,
+            AttributeKey.stringKey("currency"), "USD"
+        ))
+        
         val transaction = transactionRepository.create(
             userId = userId,
             amount = amount,
@@ -171,12 +256,21 @@ class TransactionService(
             type = TransactionType.TOP_UP
         )
         
+        // Record user transaction frequency for top-ups
+        recordTransactionFrequency(userId, TransactionType.TOP_UP)
+        
         publishToFraudCheck(transaction)
         return transaction
     }
 
     fun createPurchase(userId: String, amount: BigDecimal, description: String, currency: String = "USD"): Transaction {
         log.info("Creating purchase - user_id: {}, amount: {}, currency: {}", userId, amount, currency)
+        
+        // Record transaction amount in original currency
+        transactionAmount.record(amount.toDouble(), Attributes.of(
+            AttributeKey.stringKey("transaction_type"), TransactionType.PURCHASE.name,
+            AttributeKey.stringKey("currency"), currency
+        ))
         
         // Convert currency if not USD
         val usdAmount = if (currency != "USD") {
@@ -193,6 +287,11 @@ class TransactionService(
                 throw RuntimeException("Failed to convert currency: ${response.status}")
             }
             
+            currencyConversionVolume.add(1, Attributes.of(
+                AttributeKey.stringKey("from_currency"), currency,
+                AttributeKey.stringKey("to_currency"), "USD"
+            ))
+            
             val conversionResponse = conversionResponseLens(response)
             conversionResponse.data?.convertedAmount 
                 ?: throw RuntimeException("Currency conversion response was empty")
@@ -207,8 +306,24 @@ class TransactionService(
             type = TransactionType.PURCHASE
         )
         
+        // Record user transaction frequency for purchases
+        recordTransactionFrequency(userId, TransactionType.PURCHASE)
+        
         publishToFraudCheck(transaction)
         return transaction
+    }
+
+    private fun recordTransactionFrequency(userId: String, type: TransactionType) {
+        val lastTransaction = transactionRepository.findByUserId(userId)
+            .filter { it.type == type }
+            .maxByOrNull { it.createdAt }
+        
+        if (lastTransaction != null) {
+            val timeSinceLastTransaction = Duration.between(lastTransaction.createdAt, java.time.Instant.now()).seconds
+            userTransactionFrequency.record(timeSinceLastTransaction.toDouble(), Attributes.of(
+                AttributeKey.stringKey("transaction_type"), type.name
+            ))
+        }
     }
 
     private fun publishToFraudCheck(transaction: Transaction) {
