@@ -1,5 +1,6 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
+import { SharedArray } from 'k6/data';
 
 export const options = {
     vus: 2, // Number of virtual users
@@ -8,14 +9,20 @@ export const options = {
 
 const BASE_URL = 'http://public-api:8080';
 
-// Helper function to generate random user data
-function generateUser() {
-    const id = Math.floor(Math.random() * 1000000);
-    return {
-        username: `user_${id}`,
-        email: `user_${id}@example.com`
-    };
-}
+// Create a shared array to store our 10 fixed users
+const users = new SharedArray('users', function() {
+    const users = [];
+    for (let i = 0; i < 10; i++) {
+        users.push({
+            username: `fixed_user_${i}`,
+            email: `fixed_user_${i}@example.com`
+        });
+    }
+    return users;
+});
+
+// Store created user IDs
+let createdUserIds = new Set();
 
 // Helper function to generate random amount
 function generateAmount() {
@@ -37,28 +44,36 @@ function generatePurchase() {
     };
 }
 
-export default function() {
-    // 1. Create a user
-    const userData = generateUser();
-    const createUserRes = http.post(`${BASE_URL}/user/create`, JSON.stringify(userData), {
-        headers: { 'Content-Type': 'application/json' },
-    });
-    check(createUserRes, { 'user created': (r) => r.status === 201 });
+// Setup function to create our fixed set of users
+export function setup() {
+    const userIds = [];
 
-    // Extract the user ID from the response
-    let userId;
-    try {
-        const responseBody = JSON.parse(createUserRes.body);
-        userId = responseBody.data.id;
-        console.log(`Created user with ID: ${userId}`);
-    } catch (e) {
-        console.error('Failed to parse user creation response:', e);
-        return;
+    // Only create users if they don't exist
+    for (const userData of users) {
+        const createUserRes = http.post(`${BASE_URL}/user/create`, JSON.stringify(userData), {
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (createUserRes.status === 201) {
+            try {
+                const responseBody = JSON.parse(createUserRes.body);
+                userIds.push(responseBody.data.id);
+                console.log(`Created user with ID: ${responseBody.data.id}`);
+            } catch (e) {
+                console.error('Failed to parse user creation response:', e);
+            }
+        }
+        sleep(1);
     }
 
-    sleep(1);
+    return { userIds: userIds };
+}
 
-    // 2. Top up the user's account
+export default function(data) {
+    // Get a random user ID from our fixed set
+    const userId = data.userIds[Math.floor(Math.random() * data.userIds.length)];
+
+    // 1. Top up the user's account
     const topUpData = {
         amount: generateAmount(),
         currency: generateCurrency()
@@ -70,7 +85,7 @@ export default function() {
 
     sleep(1);
 
-    // 3. Make a purchase
+    // 2. Make a purchase
     const purchaseData = generatePurchase();
     const purchaseRes = http.post(`${BASE_URL}/user/${userId}/purchase`, JSON.stringify(purchaseData), {
         headers: { 'Content-Type': 'application/json' },
@@ -79,7 +94,7 @@ export default function() {
 
     sleep(1);
 
-    // 4. Get user transactions
+    // 3. Get user transactions
     const getTxRes = http.get(`${BASE_URL}/user/${userId}/transactions`, {
         headers: { 'Content-Type': 'application/json' },
     });

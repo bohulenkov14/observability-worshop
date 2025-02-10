@@ -241,28 +241,16 @@
                 "tooltip": { "mode": "multi" }
             },
             "targets": [{
-                "expr": "sum(balance_changes_USD) by (operation_type)",
+                "expr": "histogram_quantile(0.95, sum(rate(balance_changes_bucket[5m])) by (le, operation_type))",
                 "format": "time_series",
                 "instant": false,
                 "interval": "",
-                "legendFormat": "{{operation_type}} rate",
+                "legendFormat": "{{operation_type}} - 95th percentile",
                 "refId": "A",
                 "exemplar": true
             }],
-            "title": "Balance Changes Rate by Operation Type",
-            "description": "Rate of balance changes per second, showing credits (increases) and debits (decreases).",
-            "fieldConfig": {
-                "defaults": {
-                    "unit": "currencyUSD",
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            { "color": "green", "value": null }
-                        ]
-                    }
-                },
-                "overrides": []
-            },
+            "title": "Balance Changes by Operation Type (95th percentile)",
+            "description": "Distribution of balance changes over time, showing the 95th percentile of credits (increases) and debits (decreases).",
             "type": "timeseries"
         }
     ],

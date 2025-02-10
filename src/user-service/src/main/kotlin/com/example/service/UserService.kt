@@ -15,9 +15,11 @@ class UserService(private val userRepository: UserRepository) {
     private val meter = GlobalOpenTelemetry.getMeter("user-service")
 
     // Balance Change Metrics
-    private val balanceChanges = meter.upDownCounterBuilder("balance_changes")
-        .setDescription("Sum of balance changes")
-        .setUnit("USD")
+    private val balanceChanges = meter.histogramBuilder("balance_changes")
+        .setDescription("Distribution of balance changes")
+        .setExplicitBucketBoundariesAdvice(
+            listOf(1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0)
+        )
         .build()
 
     fun createUser(username: String, email: String): User {
@@ -31,8 +33,8 @@ class UserService(private val userRepository: UserRepository) {
         
         if (user != null) {
             val balanceDelta = newBalance - user.balance
-            balanceChanges.add(balanceDelta.toLong(), Attributes.of(
-2                AttributeKey.stringKey("user_id"), userId,
+            balanceChanges.record(balanceDelta.abs().toDouble(), Attributes.of(
+                AttributeKey.stringKey("user_id"), userId,
                 AttributeKey.stringKey("operation_type"), if (balanceDelta >= BigDecimal.ZERO) "credit" else "debit"
             ))
         }
