@@ -1,8 +1,10 @@
 # Observability Workshop
 Goal - try out observability tools with a simple distributed system inplemented in kotlin
 
-## Problem 1
-You receive alert about transaction processing taking longer than expected. Critical level alert.
+## Problem 2
+You receive alert from customer - his balance is much lower than it should be. He already called his lawyer and threatens to sue you.
+
+![Problem 2](./problem_2.jpeg)
 
 ## Technology Used
 - Kotlin
@@ -15,7 +17,7 @@ You receive alert about transaction processing taking longer than expected. Crit
 - Loki
 
 ## How to run
-- Run from current dirrectry with `docker compose up`
+- Run from current dirrectry with `docker compose up -d`, or if you previously ran this in other branch `docker compose down && docker compose up -d --build`
 - Navigate to `http://localhost:3000/` to see the grafana dashboard
 
 ## Architecture
