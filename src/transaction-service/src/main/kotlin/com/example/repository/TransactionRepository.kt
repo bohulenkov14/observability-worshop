@@ -13,6 +13,7 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
+import java.util.Collections
 
 object Transactions : UUIDTable("transactions") {
     val userId = varchar("user_id", 36)
@@ -26,6 +27,7 @@ object Transactions : UUIDTable("transactions") {
 class TransactionRepository {
     private val log = LoggerFactory.getLogger(TransactionRepository::class.java)
     private val transactions = ConcurrentHashMap<String, Transaction>()
+    private val transactionHistory = Collections.synchronizedList(mutableListOf<Transaction>())
 
     init {
         transaction {
@@ -49,6 +51,10 @@ class TransactionRepository {
             createdAt = Instant.now()
         )
         transactions[transaction.id] = transaction
+        transactionHistory.add(transaction.copy())
+        if (transactionHistory.size % 1000 == 0) {
+            log.info("Transaction history size: {}", transactionHistory.size)
+        }
         return transaction
     }
 
