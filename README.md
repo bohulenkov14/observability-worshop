@@ -2,7 +2,9 @@
 Goal - try out observability tools with a simple distributed system inplemented in kotlin
 
 ## Problem 3
-Once againm you receive alert from customer - his balance does not match with his operations.
+Your reconciliation team raises an incident - they noticed that some customers have mismatched balances.
+
+![Problem 3](./problem_3.jpg)
 
 ## Technology Used
 - Kotlin
@@ -15,7 +17,7 @@ Once againm you receive alert from customer - his balance does not match with hi
 - Loki
 
 ## How to run
-- Run from current dirrectry with `docker compose up`, or if you previously ran this in other branch `docker compose down && docker compose up --build`
+- Run from current dirrectry with `docker compose up -d`, or if you previously ran this in other branch `docker compose down && docker compose up --build`
 - Navigate to `http://localhost:3000/` to see the grafana dashboard
 
 ## Architecture
