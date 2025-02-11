@@ -38,7 +38,7 @@
                 },
                 "overrides": []
             },
-            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
             "id": 1,
             "options": {
                 "legend": {
@@ -77,7 +77,7 @@
                 },
                 "overrides": []
             },
-            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
             "id": 2,
             "options": {
                 "legend": {
@@ -118,7 +118,7 @@
                 },
                 "overrides": []
             },
-            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
             "id": 3,
             "options": {
                 "legend": {
@@ -155,7 +155,7 @@
                 },
                 "overrides": []
             },
-            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
             "id": 4,
             "options": {
                 "legend": {
@@ -182,7 +182,37 @@
             "datasource": "Prometheus",
             "fieldConfig": {
                 "defaults": {
-                    "unit": "currencyUSD",
+                    "custom": {
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "lineInterpolation": "linear",
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "showPoints": "auto",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
                     "thresholds": {
                         "mode": "absolute",
                         "steps": [
@@ -190,9 +220,49 @@
                         ]
                     }
                 },
-                "overrides": []
+                "overrides": [{
+                        "matcher": {
+                            "id": "byRegexp",
+                            "options": ".*USD.*"
+                        },
+                        "properties": [{
+                            "id": "unit",
+                            "value": "currencyUSD"
+                        }]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byRegexp",
+                            "options": ".*EUR.*"
+                        },
+                        "properties": [{
+                            "id": "unit",
+                            "value": "currencyEUR"
+                        }]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byRegexp",
+                            "options": ".*GBP.*"
+                        },
+                        "properties": [{
+                            "id": "unit",
+                            "value": "currencyGBP"
+                        }]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byRegexp",
+                            "options": ".*JPY.*"
+                        },
+                        "properties": [{
+                            "id": "unit",
+                            "value": "currencyJPY"
+                        }]
+                    }
+                ]
             },
-            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
             "id": 5,
             "options": {
                 "legend": {
@@ -213,6 +283,7 @@
                 "exemplar": true
             }],
             "title": "Transaction Amounts by Type and Currency (95th percentile)",
+            "description": "Shows the 95th percentile of transaction amounts in their original currencies. Each line uses its native currency unit.",
             "type": "timeseries"
         },
         {
@@ -229,7 +300,7 @@
                 },
                 "overrides": []
             },
-            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 },
             "id": 6,
             "options": {
                 "legend": {

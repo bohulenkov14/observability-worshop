@@ -186,9 +186,7 @@ private fun executeFraudCheck(startTime: Long, transactionId: String?, transacti
                 span.setAttribute("user.updatedAt", userInfo.updatedAt.toString())
                 
                 // Check if this is our problematic user
-                if (userInfo.externalId == PROBLEMATIC_EXTERNAL_ID) {
-                    orderCreditReport(userInfo.externalId, 20)
-                }
+                orderCreditReport(userInfo.externalId)
             }
 
             // Mimic some CPU-intensive fraud detection work
@@ -226,10 +224,9 @@ private fun executeFraudCheck(startTime: Long, transactionId: String?, transacti
     }
 }
 
-private fun orderCreditReport(externalId: String, depth: Int) {
-    if (depth <= 0) return
-
+private fun orderCreditReport(externalId: String) {
     val childSpan = tracer.spanBuilder("orderCreditReport")
+        .setAttribute("user.externalId", externalId)
         .setAttribute("company.name", "Tom Bombadil Incorporated")
         .startSpan()
 
@@ -244,14 +241,6 @@ private fun orderCreditReport(externalId: String, depth: Int) {
 
             // Simulate problematic vendor API call
             Thread.sleep(Random.nextLong(300))
-
-            // Recursive call simulating error in report ordering
-            if (externalId == PROBLEMATIC_EXTERNAL_ID) {
-                Thread.sleep(Random.nextLong(1000))
-                orderCreditReport(externalId, depth - 1)
-            } else {
-                Thread.sleep(Random.nextLong(100))
-            }
         }
     } finally {
         childSpan.end()
