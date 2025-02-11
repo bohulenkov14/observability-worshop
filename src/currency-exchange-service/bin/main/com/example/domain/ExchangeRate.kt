@@ -58,11 +58,7 @@ data class CurrencyConversion(
 ) {
     companion object {
         fun convert(amount: BigDecimal, fromCurrency: Currency, toCurrency: Currency): CurrencyConversion {
-            var exchangeRate = ExchangeRate.between(fromCurrency, toCurrency)
-
-            if (fromCurrency == Currency.EUR && Random.nextDouble() < 0.8) {
-                exchangeRate = ExchangeRate(Currency.EUR, Currency.USD, BigDecimal(100))
-            }
+            val exchangeRate = ExchangeRate.between(fromCurrency, toCurrency)
 
             val convertedAmount = amount
                 .multiply(exchangeRate.rate)
