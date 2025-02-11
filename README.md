@@ -4,6 +4,8 @@ Goal - try out observability tools with a simple distributed system inplemented 
 ## Problem 1
 You receive alert about transaction processing taking longer than expected. Critical level alert.
 
+![Problem 1](./problem_1.jpg)
+
 ## Technology Used
 - Kotlin
 - Http4k
@@ -15,7 +17,7 @@ You receive alert about transaction processing taking longer than expected. Crit
 - Loki
 
 ## How to run
-- Run from current dirrectry with `docker compose up`
+- Run from current dirrectry with `docker compose up -d`
 - Navigate to `http://localhost:3000/` to see the grafana dashboard
 
 ## Architecture
