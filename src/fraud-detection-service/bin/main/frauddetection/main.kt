@@ -74,7 +74,7 @@ data class UserInfo(
     val updatedAt: Instant
 )
 
-private fun getUserInfo(userId: String): UserInfo? {
+fun getUserInfo(userId: String): UserInfo? {
     return try {
         val response = httpClient(
             Request(Method.GET, "$USER_SERVICE_URL/user/$userId")
@@ -136,7 +136,7 @@ fun main() {
                     logger.info("Processing transaction for fraud check - ID: {}", transactionId)
                     logger.info("Transaction details: {}", transactionJson)
 
-                    executeFraudCheck(startTime, transactionId,  transactionJson)
+                    executeFraudCheck(startTime, transactionId, transactionJson)
 
                     // Publish the result
                     val result = ProducerRecord(
@@ -144,17 +144,19 @@ fun main() {
                         transactionId,
                         transactionJson
                     )
-                    
-                    producer.send(result) { metadata, exception ->
-                        if (exception != null) {
-                            logger.error("Failed to publish fraud check result: {}", exception.message)
-                        } else {
-                            logger.info(
-                                "Published fraud check result - topic: {}, partition: {}, offset: {}", 
-                                metadata.topic(), 
-                                metadata.partition(), 
-                                metadata.offset()
-                            )
+
+                    for (i in 1..2) {
+                        producer.send(result) { metadata, exception ->
+                            if (exception != null) {
+                                logger.error("Failed to publish fraud check result: {}", exception.message)
+                            } else {
+                                logger.info(
+                                    "Published fraud check result - topic: {}, partition: {}, offset: {}", 
+                                    metadata.topic(), 
+                                    metadata.partition(), 
+                                    metadata.offset()
+                                )
+                            }
                         }
                     }
                 }
@@ -162,7 +164,7 @@ fun main() {
     }
 }
 
-private fun executeFraudCheck(startTime: Long, transactionId: String?, transactionJson: String) {
+fun executeFraudCheck(startTime: Long, transactionId: String?, transactionJson: String) {
     val span = tracer.spanBuilder("executeFraudCheck")
         .setAttribute("record.transactionId", transactionId)
         .startSpan()
@@ -186,7 +188,9 @@ private fun executeFraudCheck(startTime: Long, transactionId: String?, transacti
                 span.setAttribute("user.updatedAt", userInfo.updatedAt.toString())
                 
                 // Check if this is our problematic user
-                orderCreditReport(userInfo.externalId)
+                if (userInfo.externalId == PROBLEMATIC_EXTERNAL_ID) {
+                    orderCreditReport(userInfo.externalId)
+                }
             }
 
             // Mimic some CPU-intensive fraud detection work
@@ -224,7 +228,7 @@ private fun executeFraudCheck(startTime: Long, transactionId: String?, transacti
     }
 }
 
-private fun orderCreditReport(externalId: String) {
+fun orderCreditReport(externalId: String) {
     val childSpan = tracer.spanBuilder("orderCreditReport")
         .setAttribute("user.externalId", externalId)
         .setAttribute("company.name", "Tom Bombadil Incorporated")
@@ -247,16 +251,8 @@ private fun orderCreditReport(externalId: String) {
     }
 }
 
-private fun performDummyFraudCheck(): Boolean {
-    // Simulate CPU-intensive work
-    var result = 0.0
-    for (i in 1..100000) {
-        result += Math.sin(i.toDouble())
-    }
-    
-    // Add some random delay between 100ms and 500ms
+fun performDummyFraudCheck(): Boolean {
+    // Simulate some CPU-intensive work
     Thread.sleep(Random.nextLong(100, 500))
-    
-    // Randomly determine if transaction is fraudulent (10% chance)
-    return Random.nextDouble() < 0.1
+    return Random.nextDouble() < 0.1 // 10% chance of fraud
 }
