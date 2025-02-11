@@ -274,16 +274,44 @@
                 "tooltip": { "mode": "multi" }
             },
             "targets": [{
-                "expr": "histogram_quantile(0.95, sum(rate(transaction_amount_bucket[5m])) by (le, transaction_type, currency))",
-                "format": "time_series",
-                "instant": false,
-                "interval": "",
-                "legendFormat": "{{transaction_type}} ({{currency}}) - 95th percentile",
-                "refId": "A",
-                "exemplar": true
-            }],
+                    "expr": "histogram_quantile(0.95, sum by (le, transaction_type, currency) (rate(transaction_amount_usd_USD_bucket{currency=\"USD\"}[5m])))",
+                    "format": "time_series",
+                    "instant": false,
+                    "interval": "",
+                    "legendFormat": "{{transaction_type}} (USD) - 95th percentile",
+                    "refId": "A",
+                    "exemplar": true
+                },
+                {
+                    "expr": "histogram_quantile(0.95, sum by (le, transaction_type, currency) (rate(transaction_amount_eur_EUR_bucket{currency=\"EUR\"}[5m])))",
+                    "format": "time_series",
+                    "instant": false,
+                    "interval": "",
+                    "legendFormat": "{{transaction_type}} (EUR) - 95th percentile",
+                    "refId": "B",
+                    "exemplar": true
+                },
+                {
+                    "expr": "histogram_quantile(0.95, sum by (le, transaction_type, currency) (rate(transaction_amount_gbp_GBP_bucket{currency=\"GBP\"}[5m])))",
+                    "format": "time_series",
+                    "instant": false,
+                    "interval": "",
+                    "legendFormat": "{{transaction_type}} (GBP) - 95th percentile",
+                    "refId": "C",
+                    "exemplar": true
+                },
+                {
+                    "expr": "histogram_quantile(0.95, sum by (le, transaction_type, currency) (rate(transaction_amount_jpy_JPY_bucket{currency=\"JPY\"}[5m])))",
+                    "format": "time_series",
+                    "instant": false,
+                    "interval": "",
+                    "legendFormat": "{{transaction_type}} (JPY) - 95th percentile",
+                    "refId": "D",
+                    "exemplar": true
+                }
+            ],
             "title": "Transaction Amounts by Type and Currency (95th percentile)",
-            "description": "Shows the 95th percentile of transaction amounts in their original currencies. Each line uses its native currency unit.",
+            "description": "Shows the 95th percentile of transaction amounts in their native currencies. Each line uses its native currency unit.",
             "type": "timeseries"
         },
         {

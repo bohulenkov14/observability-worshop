@@ -80,9 +80,36 @@ class TransactionService(
         .build()
 
     // Transaction Amount Metrics
-    private val transactionAmount = meter.histogramBuilder("transaction_amount")
-        .setDescription("Distribution of transaction amounts in original currency")
-        .setUnit("1")
+    private val transactionAmountUSD = meter.histogramBuilder("transaction_amount_usd")
+        .setDescription("Distribution of transaction amounts in USD")
+        .setUnit("USD")
+        .setExplicitBucketBoundariesAdvice(listOf(
+            100.0, 250.0, 500.0, 750.0, 1000.0, 1250.0, 1500.0, 1750.0, 2000.0
+        ))
+        .build()
+
+    private val transactionAmountEUR = meter.histogramBuilder("transaction_amount_eur")
+        .setDescription("Distribution of transaction amounts in EUR")
+        .setUnit("EUR")
+        .setExplicitBucketBoundariesAdvice(listOf(
+            100.0, 250.0, 500.0, 750.0, 1000.0, 1250.0, 1500.0, 1750.0, 2000.0
+        ))
+        .build()
+
+    private val transactionAmountGBP = meter.histogramBuilder("transaction_amount_gbp")
+        .setDescription("Distribution of transaction amounts in GBP")
+        .setUnit("GBP")
+        .setExplicitBucketBoundariesAdvice(listOf(
+            100.0, 250.0, 500.0, 750.0, 1000.0, 1250.0, 1500.0, 1750.0, 2000.0
+        ))
+        .build()
+
+    private val transactionAmountJPY = meter.histogramBuilder("transaction_amount_jpy")
+        .setDescription("Distribution of transaction amounts in JPY")
+        .setUnit("JPY")
+        .setExplicitBucketBoundariesAdvice(listOf(
+            50000.0, 75000.0, 100000.0, 125000.0, 150000.0, 175000.0, 200000.0, 225000.0, 250000.0
+        ))
         .build()
 
     private val conversionResponseLens = Body.auto<ApiResponse<CurrencyConversionResponse>>().toLens()
@@ -287,7 +314,7 @@ class TransactionService(
         log.info("Creating top-up - user_id: {}, amount: {}", userId, amount)
         
         // Record transaction amount
-        transactionAmount.record(amount.toDouble(), Attributes.of(
+        transactionAmountUSD.record(amount.toDouble(), Attributes.of(
             AttributeKey.stringKey("transaction_type"), TransactionType.TOP_UP.name,
             AttributeKey.stringKey("currency"), "USD"
         ))
@@ -314,11 +341,25 @@ class TransactionService(
     fun createPurchase(userId: String, amount: BigDecimal, description: String, currency: String = "USD"): Transaction {
         log.info("Creating purchase - user_id: {}, amount: {}, currency: {}", userId, amount, currency)
         
-        // Record transaction amount in original currency
-        transactionAmount.record(amount.toDouble(), Attributes.of(
-            AttributeKey.stringKey("transaction_type"), TransactionType.PURCHASE.name,
-            AttributeKey.stringKey("currency"), currency
-        ))
+        // Record transaction amount in currency-specific metric
+        when (currency) {
+            "USD" -> transactionAmountUSD.record(amount.toDouble(), Attributes.of(
+                AttributeKey.stringKey("transaction_type"), TransactionType.PURCHASE.name,
+                AttributeKey.stringKey("currency"), "USD"
+            ))
+            "EUR" -> transactionAmountEUR.record(amount.toDouble(), Attributes.of(
+                AttributeKey.stringKey("transaction_type"), TransactionType.PURCHASE.name,
+                AttributeKey.stringKey("currency"), "EUR"
+            ))
+            "GBP" -> transactionAmountGBP.record(amount.toDouble(), Attributes.of(
+                AttributeKey.stringKey("transaction_type"), TransactionType.PURCHASE.name,
+                AttributeKey.stringKey("currency"), "GBP"
+            ))
+            "JPY" -> transactionAmountJPY.record(amount.toDouble(), Attributes.of(
+                AttributeKey.stringKey("transaction_type"), TransactionType.PURCHASE.name,
+                AttributeKey.stringKey("currency"), "JPY"
+            ))
+        }
         
         // Convert currency if not USD
         val usdAmount = if (currency != "USD") {

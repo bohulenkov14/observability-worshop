@@ -1,0 +1,33 @@
+{
+    "title": "Transaction Amounts by Type and Currency (95th percentile)",
+    "targets": [{
+            "expr": "histogram_quantile(0.95, sum(rate(transaction_amount_usd_bucket[5m])) by (le, transaction_type))",
+            "legendFormat": "{{transaction_type}} (USD) - 95th percentile",
+            "refId": "USD"
+        },
+        {
+            "expr": "histogram_quantile(0.95, sum(rate(transaction_amount_eur_bucket[5m])) by (le, transaction_type))",
+            "legendFormat": "{{transaction_type}} (EUR) - 95th percentile",
+            "refId": "EUR"
+        },
+        {
+            "expr": "histogram_quantile(0.95, sum(rate(transaction_amount_gbp_bucket[5m])) by (le, transaction_type))",
+            "legendFormat": "{{transaction_type}} (GBP) - 95th percentile",
+            "refId": "GBP"
+        },
+        {
+            "expr": "histogram_quantile(0.95, sum(rate(transaction_amount_jpy_bucket[5m])) by (le, transaction_type))",
+            "legendFormat": "{{transaction_type}} (JPY) - 95th percentile",
+            "refId": "JPY"
+        }
+    ],
+    "type": "timeseries",
+    "yaxes": [{
+            "format": "currencyJPY,EUR,GBP,USD",
+            "label": "Amount"
+        },
+        {
+            "format": "short"
+        }
+    ]
+}

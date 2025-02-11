@@ -21,8 +21,10 @@ data class ExchangeRate(
         fun between(fromCurrency: Currency, toCurrency: Currency): ExchangeRate {
             val rate = when {
                 fromCurrency == toCurrency -> BigDecimal.ONE
-                fromCurrency == Currency.USD -> USD_RATES[toCurrency]
-                    ?: throw UnsupportedCurrencyException(toCurrency)
+                fromCurrency == Currency.USD -> BigDecimal.ONE.divide(
+                    USD_RATES[toCurrency] ?: throw UnsupportedCurrencyException(toCurrency),
+                    6, RoundingMode.HALF_UP
+                )
                 toCurrency == Currency.USD -> USD_RATES[fromCurrency]
                     ?: throw UnsupportedCurrencyException(fromCurrency)
                 else -> {
